@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1536215587893.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "1E8DC1AD",
+    "lastKnownWriteTime" : 808269361,
+    "last_content_update" : -1382704075,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "FFEC2365",
+        "caption" : "gps_sample",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=gps_sample&cache_key=FFEC2365",
+        "displayedObservations" : 800,
+        "environment" : "",
+        "object" : "gps_sample",
+        "preview" : 0,
+        "totalObservations" : 800,
+        "variables" : 15
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

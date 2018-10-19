@@ -1,0 +1,247 @@
+---
+title: "Vignette - transportation safety data"
+author:
+  - Miao Cai^[Department of Epidemiology and Biostatistics, Saint Louis University. Email address [miao.cai@slu.edu](miao.cai@slu.edu)]
+  - Amir Mehdizadeh^[Department of Industrial & Systems Engineering, Auburn University]
+  - Fadel M. Megahed^[Farmer School of Business, Miami University.  This author can be reached by email at [fmegahed@miamioh.edu](mailto:fmegahed@miamioh.edu).]
+  
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The first step to make accurate crash prediction is obstaining high quality data. This vignette is a reproducible demonstration on extracting online transportation safety data.
+
+
+
+
+# Weather data
+
+In this part, we show how to get both historical and real-time weather data using [DarkSky API](https://darksky.net/dev/docs/libraries). It can be used in both [Python](https://github.com/bitpixdigital/forecastiopy3) and [R](https://github.com/hrbrmstr/darksky). Before using the DarkSky API to get weather data, you need to register for a API key on [its official website](https://darksky.net/dev/register). The first 1000 API requests you make each day are free, but each API request over the 1000 daily limit will cost you $0.0001, which means a million extra API requests will cost you 100 USD. 
+
+The DarkSky API provides the following meteoreological variables:
+
+- Apparent (feels-like) temperature
+- Atmospheric pressure
+- Cloud cover
+- Dew point
+- Humidity
+- Liquid precipitation rate
+- Moon phase
+- Nearest storm distance
+- Nearest storm direction
+- Ozone
+- Precipitation type
+- Snowfall
+- Sun rise/set
+- Temperature
+- Text summaries
+- UV index
+- Wind gust
+- Wind speed
+- Wind direction
+
+
+The data provided by darksky API includes 3 parts: 
+
+- hourly weather data. 24 hourly observations for each 15 weather variables in that day.
+- daily weather data. 1 observations for each 34 weather variables in that day.
+- current weather data. 1 observations for each 15 weather variables at the assigned time point.
+
+In this part of the vignette, we will show the readers how to get historical and real-time weather data for a sample of 20 observations. The orginal data include only three variables: longitude, latitude, and the local time, which are the required variables to obtain weather data from DarkSky API. Below is how the orginal data look like:
+
+```{r load_data}
+gps_sample = 
+  structure(list(
+    from_lat = c(41.3473127, 41.8189037, 32.8258477, 
+40.6776808, 40.2366043, 41.3945561, 32.6320605, 40.5413856, 33.6287422, 
+40.0692742, 41.347986, 37.7781459, 43.0843081, 41.48026, 43.495149, 
+41.5228684, 41.5763081, 47.6728665, 41.0918361, 41.1537819),
+    from_lon = c(-74.2850908, -73.0835104, -97.0306677, -75.1450753, 
+    -76.9367494, -72.8589916, -96.8538145, -74.8547061, -113.7671634, 
+    -76.762612, -74.284785, -77.4615586, -76.0977384, -73.2107541, 
+    -73.7727896, -74.0739204, -88.1529175, -117.3224667, -74.1554972, 
+    -74.1887031), 
+  beg_time = structure(c(1453101738, 1437508088, 
+    1436195038, 1435243088, 1454270680, 1432210106, 1438937772, 
+    1446486480, 1450191622, 1449848630, 1457597084, 1432870446, 
+    1457968284, 1451298724, 1431503502, 1443416864, 1438306368, 
+    1445540454, 1452619392, 1436091072), class = c("POSIXct", 
+    "POSIXt"), tzone = "UTC")), .Names = c("from_lat", "from_lon", 
+"beg_time"), row.names = c(NA, 20L), class = c("tbl_df", "tbl", 
+"data.frame"))
+
+gps_sample
+```
+
+
+```{r darksky, message = FALSE, cache = TRUE}
+library(darksky)
+library(tidyverse)
+
+Sys.setenv(DARKSKY_API_KEY = "9f219edf4689a0f26a83aa4d9a46f25a")
+
+t = get_forecast_for(38.642105, -90.244440, Sys.time())
+
+```
+
+
+## Historical data (daily)
+
+### Historical daily data
+
+The following 39 meteoreological variables can be obtained from DarkSky API.
+
+- time            
+- summary                
+- icon          
+- sunriseTime      
+- sunsetTime             
+- moonPhase                  
+- precipIntensity           
+- precipIntensityMax       
+- precipIntensityMaxTime    
+- precipProbability        
+- precipType                 
+- temperatureHigh        
+- temperatureHighTime      
+- temperatureLow            
+- temperatureLowTime 
+- apparentTemperatureHigh 
+- apparentTemperatureHighTime
+- apparentTemperatureLow     
+- apparentTemperatureLowTime
+- dewPoint                 
+- humidity         
+- pressure                  
+- windSpeed           
+- windGust                 
+- windGustTime         
+- windBearing    
+- cloudCover        
+- uvIndex          
+- uvIndexTime           
+- visibility     
+- ozone                   
+- temperatureMin    
+- temperatureMinTime         
+- temperatureMax     
+- temperatureMaxTime        
+- apparentTemperatureMin 
+- apparentTemperatureMinTime 
+- apparentTemperatureMax    
+- apparentTemperatureMaxTime 
+
+A example of these daily variables for the observation t is shown as below:
+
+```{r table 2}
+as.data.frame(t[[2]])
+```
+
+### Historical hourly data
+
+The following 18 meteoreological variables can be obtained from DarkSky API. For each variabele, there are 24 observations for them, which represents the hourly weather data in that day.
+
+- time               
+- summary            
+- icon
+- precipIntensity 
+- precipProbability
+- temperature        
+- apparentTemperature
+- dewPoint           
+- humidity          
+- pressure           
+- windSpeed        
+- windGust           
+- windBearing        
+- cloudCover         
+- uvIndex            
+- visibility         
+- ozone             
+- precipType         
+
+The hourly historical weather data for the observation t is shown below:
+
+
+```{r table 1}
+t[[1]]
+```
+
+
+
+## Real-time data (<= 1 hour)
+
+- time               
+- summary  
+- icon               
+- precipIntensity  
+- precipProbability  
+- temperature       
+- apparentTemperature
+- dewPoint     
+- humidity        
+- pressure       
+- windSpeed   
+- windGust   
+- windBearing     
+- cloudCover  
+- uvIndex      
+- visibility 
+- ozone   
+
+The sample real-time data for the observation t is shown below:
+
+```{r table 3}
+as.data.frame(t[[3]])
+```
+
+
+We can also customize our data by pooled the daily, hourly and real-time weather variables together in one table using loops. One example has been shown as below:
+
+```{r pool}
+add_var = function(dat){
+  dat[,c("time", 'summary', 'icon', 'precipIntensity', 'precipProbability', 'temperature', 'apparentTemperature', 'dewPoint', 'humidity', 'pressure', 'windSpeed', 'windGust', 'windBearing', 'cloudCover', 'visibility')] = NA
+  return(dat)
+}
+
+gps_sample = add_var(gps_sample)
+
+
+for(i in 1:nrow(gps_sample)){
+  t = get_forecast_for(gps_sample$from_lat[i], gps_sample$from_lon[i], gps_sample$beg_time[i])
+  #gps_sample$time[i] = ifelse(is.null(t[[3]]$time), NA, t[[3]]$time)
+  gps_sample$summary[i] = ifelse(is.null(t[[3]]$summary), NA, t[[3]]$summary)
+  gps_sample$icon[i] = ifelse(is.null(t[[3]]$icon), NA, t[[3]]$icon)
+  gps_sample$precipIntensity[i] = ifelse(is.null(t[[3]]$precipIntensity), NA, t[[3]]$precipIntensity)
+  gps_sample$precipProbability[i] = ifelse(is.null(t[[3]]$precipProbability), NA, t[[3]]$precipProbability)
+  gps_sample$temperature[i] = ifelse(is.null(t[[3]]$temperature), NA, t[[3]]$temperature)
+  gps_sample$apparentTemperature[i] = ifelse(is.null(t[[3]]$apparentTemperature), NA, t[[3]]$apparentTemperature)
+  gps_sample$dewPoint[i] = ifelse(is.null(t[[3]]$dewPoint), NA, t[[3]]$dewPoint)
+  gps_sample$humidity[i] = ifelse(is.null(t[[3]]$humidity), NA, t[[3]]$humidity)
+  gps_sample$pressure[i] = ifelse(is.null(t[[3]]$pressure), NA, t[[3]]$pressure)
+  gps_sample$windSpeed[i] = ifelse(is.null(t[[3]]$windSpeed), NA, t[[3]]$windSpeed)
+  gps_sample$windGust[i] = ifelse(is.null(t[[3]]$windGust), NA, t[[3]]$windGust)
+  gps_sample$windBearing[i] = ifelse(is.null(t[[3]]$windBearing), NA, t[[3]]$windBearing)
+  gps_sample$cloudCover[i] = ifelse(is.null(t[[3]]$cloudCover), NA, t[[3]]$cloudCover)
+  gps_sample$visibility[i] = ifelse(is.null(t[[3]]$visibility), NA, t[[3]]$visibility)
+}
+
+
+gps_sample
+```
+
+
+
+# Road descriptors
+
+Contents are to be filled here in future...
