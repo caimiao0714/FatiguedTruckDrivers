@@ -1,15 +1,94 @@
 ---
-title: "JQT paper with 200 drivers"
+title: "Bayesian Hierarchical Censored Poisson Regression"
+subtitle: "JQT paper with 200 drivers"
 author: "Miao Cai <miao.cai@slu.edu>"
 date: "`r Sys.Date()`"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F)
+knitr::opts_chunk$set(eval = F)
+```
+
+# Poisson distribution
+
+# Censored Poisson regression
+
+Logistic regression ignores the intensity of the critical events with any number greater than 0 categorized into 1. So we adopt a Bayesian hierarchical Poisson regression to model the effect of cumulative driving time on the occurrence of critical events. Each driver has a random intercept and a random slope on cumulative driving time.
+\begin{align}
+\label{pois}
+\begin{split}
+\text{N} & \sim \text{POIS}(t\cdot\lambda)\\
+\lambda_{d(i)} & =\exp(\beta_{0, d(i)} + \beta_{1, d(i)} \cdot \text{CT} + \mathbf{\xi} \cdot \mathbf{W} + \mathbf{\nu} \cdot \mathbf{D})
+\end{split}
+\end{align}
+Where N is the number of critical events for driver $d(i)$ in time interval $j$, and it has a Poisson distribution with parameter $\lambda$. The other variables are identical as those described in Equation \ref{logis}.
+
+
+```{r BayesianPois}
+load("t.Rdata")
+
+library(rstan)
+library(rstanarm)
+library(shinystan)
+options(mc.cores=parallel::detectCores())
+
+t1 = t[1:20000,]
+
+poistan = '
+data {
+  int<lower=0> n; //total # of obs
+  int<lower=0> k;
+
+  int<lower=0> driver_num[n]; //driver id
+  int<lower=0> cnum[n]; //count outcome
+  real<lower=0> drivetime_cum[n]; //cumulative time of driving
+  real<lower=0> travelTime[n];
+  int<lower=0> precip_bi[n]; //precipitation
+}
+parameters{
+  real beta0[k];
+  real beta1[k];
+  real beta2;
+  real mu0;
+  real mu1;
+  real<lower=0> sigma0;
+  real<lower=0> sigma1;
+}
+model{
+  for(i in 1:n){
+    cnum[i] ~ poisson( travelTime[i] * exp(beta0[driver_num[i]] + beta1[driver_num[i]]*drivetime_cum[i] + beta2*precip_bi[i]) );
+  }
+  //PRIORS
+  beta2 ~ normal(0, 10);
+  for(j in 1:k){
+  beta0[j] ~ normal(mu0, sigma0);
+  beta1[j] ~ normal(mu1, sigma1);
+  }
+  //HYPERPRIORS
+  mu0 ~ normal(0, 10);
+  mu1 ~ normal(0, 10);
+  sigma0 ~ gamma(1, 1);
+  sigma1 ~ gamma(1, 1);
+}
+'
+
+datstan = list(n = nrow(t1),
+               k = max(t1$driver_num),
+               travelTime = t1$travelTime,
+               driver_num = t1$driver_num,
+               cnum = t1$cnum,
+               drivetime_cum = t1$drivetime_cum,
+               precip_bi = t1$precip_bi)
+
+hfitpois20000 <- stan(model_code=poistan, model_name="Poisstan", data=datstan, iter=5000,warmup = 1000, chains=3, control = list(adapt_delta = 0.95))
+
+save(hfitpois20000, file = "hfitpois20000.Rdata")
+
+launch_shinystan(hfitpois20000)
 ```
 
 
-
+```
 
 

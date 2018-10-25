@@ -1,13 +1,299 @@
 ---
-title: "JQT paper with 200 drivers"
+title: "Bayesian Hierarchical Bernoulli Regression"
+subtitle: "JQT paper with 200 drivers - Model 1"
 author: "Miao Cai <miao.cai@slu.edu>"
 date: "`r Sys.Date()`"
-output: pdf_document
+output: 
+  pdf_document:
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F)
+knitr::opts_chunk$set(eval = F)
 ```
 
 
+# Bernoulli Distribution
+
+# Bernoulli Regression
+
+Here we model the probability of a critical event occurred using a Bayesian hierarchical Bernoulli regression. We categorize the number of safety events during a trip into a binary variable $Y$ of either 0 or 1, where 0 indicates that no critical event occurred during that trip while 1 indicates that at least 1 critical event occurred during the trip. Since each trip $i$ has a different travel time $t_i$, we derived the Bernoulli distribution parameter $p_i$ using a Poisson distribution, with the parameter $\lambda_i$ represented by a linear combination of $\beta_i$\ and $x_i$.
+\begin{align}
+	\label{bernp}
+	\begin{split}
+		P_i & = P(\text{at least one event in trip i})\\
+		& = 1 - P(\text{no event in trip i})\\
+		& = 1 - \frac{e^{-t_i\lambda_i}(t_i\lambda_i)^0)}{0!}\\
+		& = 1 - \exp(-t_i\lambda_i)\\
+		& = 1 - \exp(-t_ie^{\beta_0 + \beta_ix_i})
+		\end{split}
+\end{align}
+Transform that into a linear function of $\beta_i, x_i$ and $t_i$
+\begin{align}
+	\label{transform}
+	\begin{split}
+		1 - P_i & = \text{EXP}(-t_ie^{\beta_0 + \beta_ix_i})\\
+		\log(1 - P_i) & = -t_ie^{\beta_0 + \beta_ix_i}\\
+		\log\frac{1}{1 - P_i} & = e^{\beta_0 + \beta_ix_i + \log(t_i)}\\
+		\log\Big(\log\frac{1}{1 - P_i}\Big) & = \beta_0 + \beta_ix_i + \log(t_i)
+	\end{split}
+\end{align}
+Then, the random effects logistic model is
+\begin{align}
+	\label{logis}
+	\begin{split}
+		Y_i & \sim \text{Bern}(P_i)\\
+		\log\Big(\log\frac{1}{1 - P_i}\Big)  & = \beta_{0, d(i)} + \beta_{1, d(i)} \cdot \text{CT}_i + \mathbf{\xi} \cdot \mathbf{W} + \mathbf{\nu} \cdot \mathbf{D_i} + \log(t_i)
+	\end{split}
+\end{align}
+
+Here the trip is indexed by $i$, $Y_i$ is the binary outcome variable of whether at least one critical event occurred in trip $i$; $d(i)$ is the driver for trip $i$, $\beta_{0, d(i)}$ is the random intercept for driver $d(i)$; $\beta_{1, d(i)}$ is the random slope for the cumulative time (CT$i$) of driving in the shift (the sum of driving time for all previous trips) for driver $d(i)$; $\mathbf{W}$ is a vector of external environment fixed effects, including precipitation intensity and probability, visibility, and whether it was sunrise or sunset time; $\mathbf{D}_i$ are driver level fixed effects, including age group and business unit; $t_i$ is the travel time for the trip $i$.
+
+We assume that the drivers are random effects, and we assume exchangeable priors of the form
+\[
+\beta_{0, d(1)}, \beta_{0, d(2)}, \ldots , \beta_{0, d(n)} \sim \text{i.i.d.} N(\mu_0,\sigma_0^2)
+\]
+and 
+\[
+\beta_{1, d(1)}, \beta_{1, d(2)}, \ldots , \beta_{1, d(n)} \sim \text{i.i.d.} N(\mu_1,\sigma_1^2)
+\]
+The parameters $\mu_0, \sigma_0, \mu_1$, and $\sigma_1$ are hyperparameters with priors. Since we do not have much prior knowledge on the hyperparameters, we assigned diffuse priors for these hyperparameters.
+\begin{align}
+	\label{prior}
+	\begin{split}
+		\mu_0 & \sim N(0, 10^2)\\
+		\mu_1 & \sim N(0, 10^2)\\
+		\sigma_0 & \sim \text{GAMMA}(1, 1)\\
+		\sigma_1 & \sim \text{GAMMA}(1, 1)
+	\end{split}
+\end{align}
+Since $\mu_0$ and $\mu_1$ can be any real number, so we assigned two normal distributions with mean of 0 and standard deviation of 10 as the priors for these two hyperparameters. In comparison, $\sigma_0$ and $\sigma_1$ must be strictly positive, so we assigned GAMMA$(1, 1)$ with wide distribution on positive real numbers as their priors.
+
+
+# Stan code
+
+## Centered parameterization
+
+
+```{r Bayesian non-standard logit model}
+library(rstan)
+library(rstanarm)
+library(shinystan)
+options(mc.cores=parallel::detectCores())
+
+
+
+
+
+
+
+load("w2wdriver.Rdata")
+w2wdriver = w2wdriver[!is.na(w2wdriver$Age),]
+
+w1000 = w2wdriver
+
+w1000$JBI00 = 0 # DCS00 as reference
+w1000$JBI00[w1000$BUSINESS_UNIT == "JBI00"] = 1
+w1000$VAN00 = 0
+w1000$VAN00[w1000$BUSINESS_UNIT == "VAN00"] = 1 # DCS00 as reference
+
+w1000$driver_num = as.integer(factor(w1000$driver_num)) # reorder driver number
+w1000$visibility[is.na(w1000$visibility)] = mean(w1000$visibility, na.rm = T)
+
+datstan = list(n = nrow(w1000),
+               k = max(w1000$driver_num),
+               driver_num = w1000$driver_num,
+               travelTime = w1000$travelTime,
+               event_i = w1000$event_i,
+               drivetime_cum = w1000$drivetime_cum,
+               Age = w1000$Age,
+               JBI00 = w1000$JBI00,
+               VAN00 = w1000$VAN00,
+               visibility = w1000$visibility,
+               precipIntensity = w1000$precipIntensity,
+               precipProbability = w1000$precipProbability)
+
+
+
+
+
+
+
+codestan = '
+data {
+  int<lower=0> n; // total # of obs
+  int<lower=0> k; // # of drivers
+
+  int<lower=0> driver_num[n]; //driver id
+  int<lower=0> event_i[n]; //binary outcome
+  real<lower=0> drivetime_cum[n]; //cumulative time of driving
+  real<lower=0> travelTime[n];
+  int<lower=0> Age[n]; //precipitation
+  int<lower=0> JBI00[n];
+  int<lower=0> VAN00[n];
+  real<lower=0> visibility[n];
+  real<lower=0> precipIntensity[n];
+  real<lower=0> precipProbability[n];
+}
+parameters{
+  vector[k] beta0;
+  vector[k] beta1;
+  real b_age;
+  real b_JBI;
+  real b_VAN;
+  real b_visibility;
+  real b_prec_inten;
+  real b_prec_prob;
+  real mu0;
+  real mu1;
+  real<lower=0> sigma0;
+  real<lower=0> sigma1;
+}
+
+model{
+//LIKELIHOOD
+  vector[n] theta;
+  
+  for(i in 1:n){
+  theta[i] = 1 - exp(-travelTime[i]* exp(beta0[driver_num[i]] + beta1[driver_num[i]]*drivetime_cum[i] + b_age*Age[i] + b_JBI*JBI00[i] + b_VAN*VAN00[i] + b_visibility*visibility[i] + b_prec_inten*precipIntensity[i] + b_prec_prob*precipProbability[i]) );
+  }
+  
+  event_i ~ bernoulli(theta);
+  //HYPERPRIORS
+  mu0 ~ normal(0, 10);
+  mu1 ~ normal(0, 10);
+  sigma0 ~ gamma(1, 1);
+  sigma1 ~ gamma(1, 1);
+  //PRIORS
+  b_age ~ normal(0, 10);
+  b_JBI ~ normal(0, 10);
+  b_VAN ~ normal(0, 10);
+  b_visibility ~ normal(0, 10);
+  b_prec_inten ~ normal(0, 10);
+  b_prec_prob ~ normal(0, 10);
+  beta0 ~ normal(mu0, sigma0);
+  beta1 ~ normal(mu1, sigma1);
+}
+'
+
+
+
+hfitnonstandlogit <- stan(model_code=codestan, model_name="hospitals1", data=datstan, iter=200,warmup = 100, chains=1, thin =1, control = list(adapt_delta = 0.8), init_r = 0.5)
+
+
+#doctoralsym2018 = hfitnonstandlogit
+#save(doctoralsym2018, file = "doctoralsym2018.Rdata")
+
+#save(hfitnonstandlogit, file = "hfitnonstandlogit.Rdata")
+shinystan::launch_shinystan(doctoralsym2018)
+
+#shinystan::launch_shinystan(hfitnonstandlogit)
+```
+
+
+## Non-centered parameterization
+
+```{r Bayesian non-standard logit model rev}
+library(rstan)
+library(rstanarm)
+library(shinystan)
+options(mc.cores=parallel::detectCores())
+
+
+
+load("w2wdriver.Rdata")
+w2wdriver = w2wdriver[!is.na(w2wdriver$Age),]
+
+w1000 = w2wdriver
+
+w1000$JBI00 = 0 # DCS00 as reference
+w1000$JBI00[w1000$BUSINESS_UNIT == "JBI00"] = 1
+w1000$VAN00 = 0
+w1000$VAN00[w1000$BUSINESS_UNIT == "VAN00"] = 1 # DCS00 as reference
+
+w1000$driver_num = as.integer(factor(w1000$driver_num)) # reorder driver number
+w1000$visibility[is.na(w1000$visibility)] = mean(w1000$visibility, na.rm = T)
+
+datstan = list(n = nrow(w1000),
+               k = max(w1000$driver_num),
+               driver_num = w1000$driver_num,
+               travelTime = w1000$travelTime,
+               event_i = w1000$event_i,
+               drivetime_cum = w1000$drivetime_cum,
+               Age = w1000$Age,
+               JBI00 = w1000$JBI00,
+               VAN00 = w1000$VAN00,
+               visibility = w1000$visibility,
+               precipIntensity = w1000$precipIntensity,
+               precipProbability = w1000$precipProbability)
+
+
+
+
+codestan = '
+data {
+  int<lower=0> n; // total # of obs
+  int<lower=0> k; // # of drivers
+
+  int<lower=0> driver_num[n]; //driver id
+  int<lower=0> event_i[n]; //binary outcome
+  real<lower=0> drivetime_cum[n]; //cumulative time of driving
+  real<lower=0> travelTime[n];
+  int<lower=0> Age[n]; //precipitation
+  int<lower=0> JBI00[n];
+  int<lower=0> VAN00[n];
+  real<lower=0> visibility[n];
+  real<lower=0> precipIntensity[n];
+  real<lower=0> precipProbability[n];
+}
+parameters{
+  vector[k] beta0;
+  vector[k] beta1;
+  real b_age;
+  real b_JBI;
+  real b_VAN;
+  real b_visibility;
+  real b_prec_inten;
+  real b_prec_prob;
+  real mu0;
+  real mu1;
+  real<lower=0> sigma0;
+  real<lower=0> sigma1;
+}
+
+model{
+//LIKELIHOOD
+  vector[n] theta;
+  
+  for(i in 1:n){
+  theta[i] = 1 - exp(-1*travelTime[i]* exp(mu0 + beta0[driver_num[i]]*sigma0 + (mu1 + beta1[driver_num[i]]*sigma1)*drivetime_cum[i] + b_age*Age[i] + b_JBI*JBI00[i] + b_VAN*VAN00[i] + b_visibility*visibility[i] + b_prec_inten*precipIntensity[i] + b_prec_prob*precipProbability[i]) );
+  }
+  
+  event_i ~ bernoulli(theta);
+  //HYPERPRIORS
+  mu0 ~ normal(0, 10);
+  mu1 ~ normal(0, 10);
+  sigma0 ~ gamma(1, 1);
+  sigma1 ~ gamma(1, 1);
+  //PRIORS
+  b_age ~ normal(0, 10);
+  b_JBI ~ normal(0, 10);
+  b_VAN ~ normal(0, 10);
+  b_visibility ~ normal(0, 10);
+  b_prec_inten ~ normal(0, 10);
+  b_prec_prob ~ normal(0, 10);
+  beta0 ~ normal(0, 1);
+  beta1 ~ normal(0, 1);
+}
+'
+
+
+
+doctoralsym2018 <- stan(model_code=codestan, model_name="hospitals1", data=datstan, iter=200,warmup = 100, chains=1, thin =1, control = list(adapt_delta = 0.8), init_r = 0.5, seed = 123)
+
+save(doctoralsym2018, file = "doctoralsym2018.Rdata")
+
+
+shinystan::launch_shinystan(doctoralsym2018)
+```
 
