@@ -4,14 +4,16 @@ subtitle: "JQT paper with 200 drivers"
 author: "Miao Cai^[Department of Epidemiology and Biostatistics, Saint Louis University. Email address [miao.cai@slu.edu](miao.cai@slu.edu)]"
 date: "`r Sys.Date()`"
 output:
-  pdf_document:
-    number_sections: yes
   html_document:
+    theme: readable
     toc: true
     toc_float: true
     number_sections: true
     df_print: paged
     code_folding: hide
+    highlight: tango
+  pdf_document:
+    number_sections: yes
 link-citations: yes
 linkcolor: blue
 ---
@@ -34,6 +36,7 @@ Logistic regression ignores the intensity of the critical events with any number
 \end{align}
 Where N is the number of critical events for driver $d(i)$ in time interval $j$, and it has a Poisson distribution with parameter $\lambda$. The other variables are identical as those described in Equation \ref{logis}.
 
+# Stan codes
 
 ```{r BayesianPois}
 load("t.Rdata")
