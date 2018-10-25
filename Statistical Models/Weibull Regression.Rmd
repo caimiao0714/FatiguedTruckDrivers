@@ -1,11 +1,19 @@
 ---
 title: "Bayesian Hierarchical Weibull Regression"
-subtitle: "JQT paper with 200 drivers - Model 3"
-author: "Miao Cai <miao.cai@slu.edu>"
+subtitle: JQT paper with 200 drivers - Model 3
+author: "Miao Cai^[Department of Epidemiology and Biostatistics, Saint Louis University. Email address [miao.cai@slu.edu](miao.cai@slu.edu)]"
 date: "`r Sys.Date()`"
-output: 
-  pdf_document:
+output:
+  html_document:
+    toc: true
+    toc_float: true
     number_sections: true
+    df_print: paged
+    code_folding: hide
+  pdf_document:
+    number_sections: yes
+link-citations: yes
+linkcolor: blue
 ---
 
 ```{r setup, include=FALSE}
@@ -50,7 +58,7 @@ Where the $\theta$ is the scale parameter and $\kappa$ is the shape parameter. W
 
 # Examples
 
-This is an example of Weibull regression provided by [the StAN forum](https://discourse.mc-stan.org/t/weibull-regression/6098). 
+This is an example of Weibull regression provided by [the STAN forum](https://discourse.mc-stan.org/t/weibull-regression/6098). 
 
 ## Example code 1
 

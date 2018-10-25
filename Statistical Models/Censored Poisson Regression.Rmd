@@ -1,9 +1,19 @@
 ---
 title: "Bayesian Hierarchical Censored Poisson Regression"
 subtitle: "JQT paper with 200 drivers"
-author: "Miao Cai <miao.cai@slu.edu>"
+author: "Miao Cai^[Department of Epidemiology and Biostatistics, Saint Louis University. Email address [miao.cai@slu.edu](miao.cai@slu.edu)]"
 date: "`r Sys.Date()`"
-output: pdf_document
+output:
+  pdf_document:
+    number_sections: yes
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    code_folding: hide
+link-citations: yes
+linkcolor: blue
 ---
 
 ```{r setup, include=FALSE}
@@ -89,6 +99,5 @@ launch_shinystan(hfitpois20000)
 ```
 
 
-```
 
 
