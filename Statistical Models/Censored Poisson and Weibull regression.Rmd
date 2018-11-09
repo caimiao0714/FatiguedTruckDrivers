@@ -1,0 +1,92 @@
+---
+title: "Censored Poisson and Weibull regression"
+author: "Miao Cai"
+date: "November 6, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r subsetData}
+# load("t.Rdata")
+# 
+# mcolor = t[,c(1:23, 62:69)]
+# mcolor$rownum = 1:nrow(mcolor)
+# save(mcolor, file = "mcolor.Rdata")
+```
+
+
+# Find identical critical events
+
+```{r multi_CEs}
+load("mcolor.Rdata")
+
+require(tidyverse)
+require(tidyr)
+
+maxCEnum = max(mcolor$cnum)
+cnum_threshold = 1
+
+CE = mcolor %>% 
+  filter(cnum > cnum_threshold) %>% 
+  select(rownum, DATIME, LAT, LON) %>% 
+  separate(DATIME, 
+           into = paste('CEDAT', 1:maxCEnum, sep = "_"),
+           sep = ";") %>% 
+  separate(LAT,
+           into = paste('CELAT', 1:maxCEnum, sep = "_"),
+           sep = ";") %>% 
+  separate(LON,
+           into = paste('CELON', 1:maxCEnum, sep = "_"),
+           sep = ";")
+
+
+CE_DAT = mcolor %>% 
+  filter(cnum > cnum_threshold) %>% 
+  select(rownum, DATIME) %>% 
+  separate(DATIME, 
+           into = paste('CEno', 1:maxCEnum, sep = "_"),
+           sep = ";") %>% 
+  gather(key = "CE_NUM", value = "DAT", - rownum) %>% 
+  filter(!is.na(DAT)) %>% 
+  mutate(DAT = lubridate::parse_date_time(DAT, c("ymd_HMS", "mdy_HM", "mdy")))
+
+
+CE_LAT = mcolor %>% 
+  filter(cnum > cnum_threshold) %>% 
+  select(rownum, LAT) %>% 
+  separate(LAT, 
+           into = paste('CEno', 1:maxCEnum, sep = "_"),
+           sep = ";") %>% 
+  gather(key = "CE_NUM", value = "LAT", - rownum) %>% 
+  filter(!is.na(LAT)) 
+
+CE_LON = mcolor %>% 
+  filter(cnum > cnum_threshold) %>% 
+  select(rownum, LON) %>% 
+  separate(LON, 
+           into = paste('CEno', 1:maxCEnum, sep = "_"),
+           sep = ";") %>% 
+  gather(key = "CE_NUM", value = "LON", -rownum) %>% 
+  filter(!is.na(LON)) 
+
+CEsimple = CE_DAT %>% 
+  left_join(CE_LAT) %>% 
+  left_join(CE_LON) %>% 
+  add_count(rownum) %>% 
+  arrange(desc(n), rownum)
+
+CE_dup = CEsimple %>% filter(duplicated(DAT))
+
+```
+
+
+
+# Weibull regression
+
+```{r weibull}
+
+```
+
