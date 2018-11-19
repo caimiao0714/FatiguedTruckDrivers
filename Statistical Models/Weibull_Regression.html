@@ -11,7 +11,7 @@
 
 <meta name="author" content="Miao Cai" />
 
-<meta name="date" content="2018-11-18" />
+<meta name="date" content="2018-11-19" />
 
 <title>Bayesian Hierarchical Weibull Regression</title>
 
@@ -271,7 +271,7 @@ div.tocify {
 <h1 class="title toc-ignore">Bayesian Hierarchical Weibull Regression</h1>
 <h3 class="subtitle"><em>JQT paper with 200 drivers - Model 3</em></h3>
 <h4 class="author"><em>Miao Cai<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a></em></h4>
-<h4 class="date"><em>2018-11-18</em></h4>
+<h4 class="date"><em>2018-11-19</em></h4>
 
 </div>
 
@@ -299,13 +299,40 @@ Y_{i, d(i), s(i)} &amp; \sim \text{WEIBULL}(\kappa, \theta) \\
 \theta &amp; = \exp(\beta_{0, d(i)} + \beta_{1, d(i)} \cdot \text{CT}_i + \mathbf{\xi} \cdot \mathbf{W} + \mathbf{\nu} \cdot \mathbf{D_i})
 \end{align*}\]</span>
 <p>Where the <span class="math inline">\(\theta\)</span> is the scale parameter and <span class="math inline">\(\kappa\)</span> is the shape parameter. When <span class="math inline">\(\kappa &gt; 1\)</span>, the hazard of having critical event is increasing as cumulative driving time gets longer, which indicates fatigued driving. When <span class="math inline">\(\kappa = 1\)</span>, the Weibull distribution becomes an exponential distribution with constant hazard <span class="math inline">\(\frac{1}{\theta}\)</span>, which indicates no fatigue. When <span class="math inline">\(0 &lt; \kappa &lt; 1\)</span>, the hazard of having critical events is decreasing with longer cumulative driving time, which indicates anti-fatigue, or burn-in.</p>
-<p>In essense, Stan is evaluating a log prob</p>
+</div>
+<div id="censoring-in-stan" class="section level1">
+<h1><span class="header-section-number">3</span> Censoring in Stan</h1>
+<p>In essense, Stan is evaluating a log probability function (probability density function or probability mass function) for a given set of parameters; this function returns the log density of the posterior up to an additive constant.</p>
+<p>There are two ways of dealing with censoring in stan:</p>
+<ul>
+<li>estimating censored values</li>
+<li>integrating out censored values</li>
+</ul>
+<p>Estimating censored values in Stan is to treat these censored values as missing data with some constraint (lower bound, upper bound or interval). These censored values will be declared as parameters with constraints, and then estimated or imputed by their distribution. However, this way is not feasible when the censored data are huge, which leads to a huge amount parameters to be estimated.</p>
+<p>The other way to deal with censored data is integrating out the censored values. Let’s assume the data are right censored, which is common in survival data analysis. The probability of each censored datum can be calculated as:</p>
+<p><span class="math display">\[
+P(t &gt; C) = \int_C^\infty f(t|\kappa, \theta)dt = 1 - \Lambda(C|\kappa, \theta)
+\]</span></p>
+<p>Where <span class="math inline">\(f(t|\kappa, \theta)\)</span> and <span class="math inline">\(\Lambda(t|\kappa, \theta)\)</span> are the probability density function and cumulative density function of Weibull distribution.</p>
+The log of total probability of <span class="math inline">\(N\)</span> censored points is:
+<span class="math display">\[\begin{equation}\label{ltotalpdf}
+\log \prod_{i = 1}^N P(t_i &gt; C_i) = \sum_{i = 1}^N\log\Big(1 - \Lambda(C_i|\kappa, \theta)\Big)
+\end{equation}\]</span>
+<p>Stan provides <code>&lt;distribution&gt;_lccdf</code> as the log of complementary CDF for built-in distributions, so <code>weibull_lccdf</code> is the log of complementary CDF of weibull distribution. The Equation @ref(ltotalpdf) can be expressed as the following function in Stan:</p>
+<span class="math display">\[\begin{align*}
+\log \prod_{i = 1}^N P(t_i &gt; C_i) &amp; = \sum_{i = 1}^N \texttt{weibull_lccdf}(C_i|\kappa, \theta)\\
+
+\end{align*}\]</span>
+<p>When it is translated into Stan <code>model</code> block, it becomes:</p>
+<pre><code>for (i in 1:N){
+  target += weibull_lccdf(censored_time[i] | kappa, theta)
+}</code></pre>
 </div>
 <div id="examples" class="section level1">
-<h1><span class="header-section-number">3</span> Examples</h1>
+<h1><span class="header-section-number">4</span> Examples</h1>
 <p>This is the Mice example of Weibull regression, originally provided in WinBUGS example models, and then provided by <a href="https://discourse.mc-stan.org/t/weibull-regression/6098">the STAN forum</a>.</p>
 <div id="data" class="section level2">
-<h2><span class="header-section-number">3.1</span> Data</h2>
+<h2><span class="header-section-number">4.1</span> Data</h2>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">rm</span>(<span class="dt">list=</span><span class="kw">ls</span>(<span class="dt">all=</span><span class="ot">TRUE</span>))
 <span class="kw">require</span>(rstan)
 <span class="kw">require</span>(shinystan)
@@ -340,7 +367,7 @@ dataList =<span class="st"> </span><span class="kw">list</span>(
 )</code></pre></div>
 </div>
 <div id="official-code-provide-by-the-stan-team" class="section level2">
-<h2><span class="header-section-number">3.2</span> Official code provide by the Stan team</h2>
+<h2><span class="header-section-number">4.2</span> Official code provide by the Stan team</h2>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">mice1 =<span class="st"> &quot;</span>
 <span class="st">data {</span>
 <span class="st">  int&lt;lower=0&gt; N_uncensored;</span>
@@ -387,112 +414,6 @@ dataList =<span class="st"> </span><span class="kw">list</span>(
 miceHMM1 &lt;-<span class="st"> </span><span class="kw">stan</span>(<span class="dt">model_code=</span>mice1, <span class="dt">data=</span>dataList, <span class="dt">seed =</span> <span class="dv">47306</span>, <span class="dt">chains=</span><span class="dv">4</span>,  
                     <span class="dt">iter=</span><span class="dv">5000</span>, 
                     <span class="dt">warmup=</span><span class="dv">2000</span> ) <span class="co"># init=initsChains</span></code></pre></div>
-<pre><code>## DIAGNOSTIC(S) FROM PARSER:
-## Info (non-fatal): assignment operator &lt;- deprecated in the Stan language; use = instead.
-## Info (non-fatal): assignment operator &lt;- deprecated in the Stan language; use = instead.
-## Info (non-fatal): assignment operator &lt;- deprecated in the Stan language; use = instead.
-## Info (non-fatal): assignment operator &lt;- deprecated in the Stan language; use = instead.
-## 
-## 
-## SAMPLING FOR MODEL 'a1b24350e63df6e1b659934b14569420' NOW (CHAIN 1).
-## Chain 1: 
-## Chain 1: Gradient evaluation took 0 seconds
-## Chain 1: 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
-## Chain 1: Adjust your expectations accordingly!
-## Chain 1: 
-## Chain 1: 
-## Chain 1: Iteration:    1 / 5000 [  0%]  (Warmup)
-## Chain 1: Iteration:  500 / 5000 [ 10%]  (Warmup)
-## Chain 1: Iteration: 1000 / 5000 [ 20%]  (Warmup)
-## Chain 1: Iteration: 1500 / 5000 [ 30%]  (Warmup)
-## Chain 1: Iteration: 2000 / 5000 [ 40%]  (Warmup)
-## Chain 1: Iteration: 2001 / 5000 [ 40%]  (Sampling)
-## Chain 1: Iteration: 2500 / 5000 [ 50%]  (Sampling)
-## Chain 1: Iteration: 3000 / 5000 [ 60%]  (Sampling)
-## Chain 1: Iteration: 3500 / 5000 [ 70%]  (Sampling)
-## Chain 1: Iteration: 4000 / 5000 [ 80%]  (Sampling)
-## Chain 1: Iteration: 4500 / 5000 [ 90%]  (Sampling)
-## Chain 1: Iteration: 5000 / 5000 [100%]  (Sampling)
-## Chain 1: 
-## Chain 1:  Elapsed Time: 3.483 seconds (Warm-up)
-## Chain 1:                5.256 seconds (Sampling)
-## Chain 1:                8.739 seconds (Total)
-## Chain 1: 
-## 
-## SAMPLING FOR MODEL 'a1b24350e63df6e1b659934b14569420' NOW (CHAIN 2).
-## Chain 2: 
-## Chain 2: Gradient evaluation took 0 seconds
-## Chain 2: 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
-## Chain 2: Adjust your expectations accordingly!
-## Chain 2: 
-## Chain 2: 
-## Chain 2: Iteration:    1 / 5000 [  0%]  (Warmup)
-## Chain 2: Iteration:  500 / 5000 [ 10%]  (Warmup)
-## Chain 2: Iteration: 1000 / 5000 [ 20%]  (Warmup)
-## Chain 2: Iteration: 1500 / 5000 [ 30%]  (Warmup)
-## Chain 2: Iteration: 2000 / 5000 [ 40%]  (Warmup)
-## Chain 2: Iteration: 2001 / 5000 [ 40%]  (Sampling)
-## Chain 2: Iteration: 2500 / 5000 [ 50%]  (Sampling)
-## Chain 2: Iteration: 3000 / 5000 [ 60%]  (Sampling)
-## Chain 2: Iteration: 3500 / 5000 [ 70%]  (Sampling)
-## Chain 2: Iteration: 4000 / 5000 [ 80%]  (Sampling)
-## Chain 2: Iteration: 4500 / 5000 [ 90%]  (Sampling)
-## Chain 2: Iteration: 5000 / 5000 [100%]  (Sampling)
-## Chain 2: 
-## Chain 2:  Elapsed Time: 4.853 seconds (Warm-up)
-## Chain 2:                6.013 seconds (Sampling)
-## Chain 2:                10.866 seconds (Total)
-## Chain 2: 
-## 
-## SAMPLING FOR MODEL 'a1b24350e63df6e1b659934b14569420' NOW (CHAIN 3).
-## Chain 3: 
-## Chain 3: Gradient evaluation took 0 seconds
-## Chain 3: 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
-## Chain 3: Adjust your expectations accordingly!
-## Chain 3: 
-## Chain 3: 
-## Chain 3: Iteration:    1 / 5000 [  0%]  (Warmup)
-## Chain 3: Iteration:  500 / 5000 [ 10%]  (Warmup)
-## Chain 3: Iteration: 1000 / 5000 [ 20%]  (Warmup)
-## Chain 3: Iteration: 1500 / 5000 [ 30%]  (Warmup)
-## Chain 3: Iteration: 2000 / 5000 [ 40%]  (Warmup)
-## Chain 3: Iteration: 2001 / 5000 [ 40%]  (Sampling)
-## Chain 3: Iteration: 2500 / 5000 [ 50%]  (Sampling)
-## Chain 3: Iteration: 3000 / 5000 [ 60%]  (Sampling)
-## Chain 3: Iteration: 3500 / 5000 [ 70%]  (Sampling)
-## Chain 3: Iteration: 4000 / 5000 [ 80%]  (Sampling)
-## Chain 3: Iteration: 4500 / 5000 [ 90%]  (Sampling)
-## Chain 3: Iteration: 5000 / 5000 [100%]  (Sampling)
-## Chain 3: 
-## Chain 3:  Elapsed Time: 3.964 seconds (Warm-up)
-## Chain 3:                7.811 seconds (Sampling)
-## Chain 3:                11.775 seconds (Total)
-## Chain 3: 
-## 
-## SAMPLING FOR MODEL 'a1b24350e63df6e1b659934b14569420' NOW (CHAIN 4).
-## Chain 4: 
-## Chain 4: Gradient evaluation took 0 seconds
-## Chain 4: 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
-## Chain 4: Adjust your expectations accordingly!
-## Chain 4: 
-## Chain 4: 
-## Chain 4: Iteration:    1 / 5000 [  0%]  (Warmup)
-## Chain 4: Iteration:  500 / 5000 [ 10%]  (Warmup)
-## Chain 4: Iteration: 1000 / 5000 [ 20%]  (Warmup)
-## Chain 4: Iteration: 1500 / 5000 [ 30%]  (Warmup)
-## Chain 4: Iteration: 2000 / 5000 [ 40%]  (Warmup)
-## Chain 4: Iteration: 2001 / 5000 [ 40%]  (Sampling)
-## Chain 4: Iteration: 2500 / 5000 [ 50%]  (Sampling)
-## Chain 4: Iteration: 3000 / 5000 [ 60%]  (Sampling)
-## Chain 4: Iteration: 3500 / 5000 [ 70%]  (Sampling)
-## Chain 4: Iteration: 4000 / 5000 [ 80%]  (Sampling)
-## Chain 4: Iteration: 4500 / 5000 [ 90%]  (Sampling)
-## Chain 4: Iteration: 5000 / 5000 [100%]  (Sampling)
-## Chain 4: 
-## Chain 4:  Elapsed Time: 3.912 seconds (Warm-up)
-## Chain 4:                4.156 seconds (Sampling)
-## Chain 4:                8.068 seconds (Total)
-## Chain 4:</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">knitr<span class="op">::</span><span class="kw">kable</span>(<span class="kw">summary</span>(miceHMM1), 
              <span class="dt">digits =</span> <span class="dv">2</span>,
              <span class="dt">caption =</span> <span class="st">'Summary statistics by the official Stan team'</span>)</code></pre></div>
@@ -1799,7 +1720,7 @@ Summary statistics by the official Stan team
 </table>
 </div>
 <div id="code-by-miao" class="section level2">
-<h2><span class="header-section-number">3.3</span> Code by Miao</h2>
+<h2><span class="header-section-number">4.3</span> Code by Miao</h2>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">miao =<span class="st"> &quot;</span>
 <span class="st">data {</span>
 <span class="st">  int&lt;lower=0&gt; N_uncensored;</span>
@@ -1848,112 +1769,6 @@ Summary statistics by the official Stan team
 miceHMM &lt;-<span class="st"> </span><span class="kw">stan</span>(<span class="dt">model_code=</span>miao, <span class="dt">data=</span>dataList, <span class="dt">seed =</span> <span class="dv">47306</span>, <span class="dt">chains=</span><span class="dv">4</span>,  
                     <span class="dt">iter=</span><span class="dv">5000</span>, 
                     <span class="dt">warmup=</span><span class="dv">2000</span> ) <span class="co"># init=initsChains</span></code></pre></div>
-<pre><code>## DIAGNOSTIC(S) FROM PARSER:
-## Info (non-fatal): assignment operator &lt;- deprecated in the Stan language; use = instead.
-## Info (non-fatal): assignment operator &lt;- deprecated in the Stan language; use = instead.
-## Info (non-fatal): assignment operator &lt;- deprecated in the Stan language; use = instead.
-## Info (non-fatal): assignment operator &lt;- deprecated in the Stan language; use = instead.
-## 
-## 
-## SAMPLING FOR MODEL '39be04c996de615920cd40f6a3cf8b10' NOW (CHAIN 1).
-## Chain 1: 
-## Chain 1: Gradient evaluation took 0 seconds
-## Chain 1: 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
-## Chain 1: Adjust your expectations accordingly!
-## Chain 1: 
-## Chain 1: 
-## Chain 1: Iteration:    1 / 5000 [  0%]  (Warmup)
-## Chain 1: Iteration:  500 / 5000 [ 10%]  (Warmup)
-## Chain 1: Iteration: 1000 / 5000 [ 20%]  (Warmup)
-## Chain 1: Iteration: 1500 / 5000 [ 30%]  (Warmup)
-## Chain 1: Iteration: 2000 / 5000 [ 40%]  (Warmup)
-## Chain 1: Iteration: 2001 / 5000 [ 40%]  (Sampling)
-## Chain 1: Iteration: 2500 / 5000 [ 50%]  (Sampling)
-## Chain 1: Iteration: 3000 / 5000 [ 60%]  (Sampling)
-## Chain 1: Iteration: 3500 / 5000 [ 70%]  (Sampling)
-## Chain 1: Iteration: 4000 / 5000 [ 80%]  (Sampling)
-## Chain 1: Iteration: 4500 / 5000 [ 90%]  (Sampling)
-## Chain 1: Iteration: 5000 / 5000 [100%]  (Sampling)
-## Chain 1: 
-## Chain 1:  Elapsed Time: 1.39 seconds (Warm-up)
-## Chain 1:                2.28 seconds (Sampling)
-## Chain 1:                3.67 seconds (Total)
-## Chain 1: 
-## 
-## SAMPLING FOR MODEL '39be04c996de615920cd40f6a3cf8b10' NOW (CHAIN 2).
-## Chain 2: 
-## Chain 2: Gradient evaluation took 0 seconds
-## Chain 2: 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
-## Chain 2: Adjust your expectations accordingly!
-## Chain 2: 
-## Chain 2: 
-## Chain 2: Iteration:    1 / 5000 [  0%]  (Warmup)
-## Chain 2: Iteration:  500 / 5000 [ 10%]  (Warmup)
-## Chain 2: Iteration: 1000 / 5000 [ 20%]  (Warmup)
-## Chain 2: Iteration: 1500 / 5000 [ 30%]  (Warmup)
-## Chain 2: Iteration: 2000 / 5000 [ 40%]  (Warmup)
-## Chain 2: Iteration: 2001 / 5000 [ 40%]  (Sampling)
-## Chain 2: Iteration: 2500 / 5000 [ 50%]  (Sampling)
-## Chain 2: Iteration: 3000 / 5000 [ 60%]  (Sampling)
-## Chain 2: Iteration: 3500 / 5000 [ 70%]  (Sampling)
-## Chain 2: Iteration: 4000 / 5000 [ 80%]  (Sampling)
-## Chain 2: Iteration: 4500 / 5000 [ 90%]  (Sampling)
-## Chain 2: Iteration: 5000 / 5000 [100%]  (Sampling)
-## Chain 2: 
-## Chain 2:  Elapsed Time: 1.422 seconds (Warm-up)
-## Chain 2:                2.153 seconds (Sampling)
-## Chain 2:                3.575 seconds (Total)
-## Chain 2: 
-## 
-## SAMPLING FOR MODEL '39be04c996de615920cd40f6a3cf8b10' NOW (CHAIN 3).
-## Chain 3: 
-## Chain 3: Gradient evaluation took 0 seconds
-## Chain 3: 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
-## Chain 3: Adjust your expectations accordingly!
-## Chain 3: 
-## Chain 3: 
-## Chain 3: Iteration:    1 / 5000 [  0%]  (Warmup)
-## Chain 3: Iteration:  500 / 5000 [ 10%]  (Warmup)
-## Chain 3: Iteration: 1000 / 5000 [ 20%]  (Warmup)
-## Chain 3: Iteration: 1500 / 5000 [ 30%]  (Warmup)
-## Chain 3: Iteration: 2000 / 5000 [ 40%]  (Warmup)
-## Chain 3: Iteration: 2001 / 5000 [ 40%]  (Sampling)
-## Chain 3: Iteration: 2500 / 5000 [ 50%]  (Sampling)
-## Chain 3: Iteration: 3000 / 5000 [ 60%]  (Sampling)
-## Chain 3: Iteration: 3500 / 5000 [ 70%]  (Sampling)
-## Chain 3: Iteration: 4000 / 5000 [ 80%]  (Sampling)
-## Chain 3: Iteration: 4500 / 5000 [ 90%]  (Sampling)
-## Chain 3: Iteration: 5000 / 5000 [100%]  (Sampling)
-## Chain 3: 
-## Chain 3:  Elapsed Time: 1.265 seconds (Warm-up)
-## Chain 3:                2.159 seconds (Sampling)
-## Chain 3:                3.424 seconds (Total)
-## Chain 3: 
-## 
-## SAMPLING FOR MODEL '39be04c996de615920cd40f6a3cf8b10' NOW (CHAIN 4).
-## Chain 4: 
-## Chain 4: Gradient evaluation took 0 seconds
-## Chain 4: 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
-## Chain 4: Adjust your expectations accordingly!
-## Chain 4: 
-## Chain 4: 
-## Chain 4: Iteration:    1 / 5000 [  0%]  (Warmup)
-## Chain 4: Iteration:  500 / 5000 [ 10%]  (Warmup)
-## Chain 4: Iteration: 1000 / 5000 [ 20%]  (Warmup)
-## Chain 4: Iteration: 1500 / 5000 [ 30%]  (Warmup)
-## Chain 4: Iteration: 2000 / 5000 [ 40%]  (Warmup)
-## Chain 4: Iteration: 2001 / 5000 [ 40%]  (Sampling)
-## Chain 4: Iteration: 2500 / 5000 [ 50%]  (Sampling)
-## Chain 4: Iteration: 3000 / 5000 [ 60%]  (Sampling)
-## Chain 4: Iteration: 3500 / 5000 [ 70%]  (Sampling)
-## Chain 4: Iteration: 4000 / 5000 [ 80%]  (Sampling)
-## Chain 4: Iteration: 4500 / 5000 [ 90%]  (Sampling)
-## Chain 4: Iteration: 5000 / 5000 [100%]  (Sampling)
-## Chain 4: 
-## Chain 4:  Elapsed Time: 1.333 seconds (Warm-up)
-## Chain 4:                1.562 seconds (Sampling)
-## Chain 4:                2.895 seconds (Total)
-## Chain 4:</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">knitr<span class="op">::</span><span class="kw">kable</span>(<span class="kw">summary</span>(miceHMM),
              <span class="dt">digits =</span> <span class="dv">2</span>,
              <span class="dt">caption =</span> <span class="st">'Summary statistics by Miao'</span>)</code></pre></div>

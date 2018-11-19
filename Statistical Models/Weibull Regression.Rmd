@@ -19,7 +19,7 @@ linkcolor: blue
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(eval = T, cache = T, message = F)
+knitr::opts_chunk$set(eval = T, cache = T)
 ```
 
 # Weibull Distribution
@@ -55,9 +55,48 @@ Y_{i, d(i), s(i)} & \sim \text{WEIBULL}(\kappa, \theta) \\
 
 Where the $\theta$ is the scale parameter and $\kappa$ is the shape parameter. When $\kappa > 1$, the hazard of having critical event is increasing as cumulative driving time gets longer, which indicates fatigued driving. When $\kappa = 1$, the Weibull distribution becomes an exponential distribution with constant hazard $\frac{1}{\theta}$, which indicates no fatigue. When $0 < \kappa < 1$, the hazard of having critical events is decreasing with longer cumulative driving time, which indicates anti-fatigue, or burn-in.
 
+# Censoring in Stan
+
 In essense, Stan is evaluating a log probability function (probability density function or probability mass function) for a given set of parameters; this function returns the log density of the posterior up to an additive constant.
 
-In this example, we
+There are two ways of dealing with censoring in stan:
+
+- estimating censored values
+- integrating out censored values
+
+Estimating censored values in Stan is to treat these censored values as missing data with some constraint (lower bound, upper bound or interval). These censored values will be declared as parameters with constraints, and then estimated or imputed by their distribution. However, this way is not feasible when the censored data are huge, which leads to a huge amount parameters to be estimated.
+
+The other way to deal with censored data is integrating out the censored values. Let's assume the data are right censored, which is common in survival data analysis. The probability of each censored datum can be calculated as:
+
+\[
+P(t > C) = \int_C^\infty f(t|\kappa, \theta)dt = 1 - \Lambda(C|\kappa, \theta)
+\]
+
+
+Where $f(t|\kappa, \theta)$ and $\Lambda(t|\kappa, \theta)$ are the probability density function and cumulative density function of Weibull distribution.
+
+
+The log of total probability of $N$ censored points is:
+\begin{equation}\label{ltotalpdf}
+\log \prod_{i = 1}^N P(t_i > C_i) = \sum_{i = 1}^N\log\Big(1 - \Lambda(C_i|\kappa, \theta)\Big)
+\end{equation}
+
+Stan provides `<distribution>_lccdf` as the log of complementary CDF for built-in distributions, so `weibull_lccdf` is the log of complementary CDF of weibull distribution. The Equation \@ref(ltotalpdf) can be expressed as the following function in Stan:
+
+\begin{align*}
+\log \prod_{i = 1}^N P(t_i > C_i) & = \sum_{i = 1}^N \texttt{weibull_lccdf}(C_i|\kappa, \theta)\\
+
+\end{align*}
+
+When it is translated into Stan `model` block, it becomes:
+
+```
+for (i in 1:N){
+  target += weibull_lccdf(censored_time[i] | kappa, theta)
+}
+```
+
+
 
 
 # Examples
@@ -103,7 +142,7 @@ dataList = list(
 
 ## Official code provide by the Stan team
 
-```{r OfficialCode}
+```{r OfficialCode, results='hide'}
 mice1 = "
 data {
   int<lower=0> N_uncensored;
@@ -161,7 +200,7 @@ knitr::kable(summary(miceHMM1),
 
 ## Code by Miao
 
-```{r MiaoCode}
+```{r MiaoCode, results='hide'}
 miao = "
 data {
   int<lower=0> N_uncensored;
