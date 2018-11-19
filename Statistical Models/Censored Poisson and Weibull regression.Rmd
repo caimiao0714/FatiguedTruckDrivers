@@ -76,7 +76,8 @@ CEsimple = CE_DAT %>%
   left_join(CE_LAT) %>% 
   left_join(CE_LON) %>% 
   add_count(rownum) %>% 
-  arrange(desc(n), rownum)
+  mutate(CE_NUM = as.numeric(gsub("CEno_", "", CE_NUM))) %>% 
+  arrange(desc(n), rownum， CE_NUM)
 
 CE_dup = CEsimple %>% filter(duplicated(DAT))
 
@@ -86,7 +87,91 @@ CE_dup = CEsimple %>% filter(duplicated(DAT))
 
 # Weibull regression
 
-```{r weibull}
+```{r weibulldata}
+load("mcolor.Rdata")
+
+require(tidyverse)
+require(tidyr)
+
+maxCEnum = max(mcolor$cnum)
+
+n_obs = 500 # the number of obs
+
+weibDat = mcolor %>% 
+  slice(1:n_obs) %>% 
+  separate(DATIME, 
+           into = paste('CEno', 1:maxCEnum, sep = "_"),
+           sep = ";") %>% 
+  select(rownum, driver_num, begDate, CEno_1, travelTime, drivetime_cum) %>%
+  mutate(t_of_CE = lubridate::parse_date_time(CEno_1, c("ymd_HMS", "mdy_HM", "mdy")),
+         t_to_CE = as.numeric(difftime(t_of_CE, begDate, units = "hours")))
+```
+
+```{r weibullstan}
+library(rstan)
+library(shinystan)
+options(mc.cores=parallel::detectCores())
+
+weibullstan = "
+data {
+int<lower=0> N_uncensored;
+int<lower=0> N_censored;
+int<lower=0> N_driver;
+
+int<lower=1,upper=N_driver> dNO_UNcen[N_uncensored];
+int<lower=1,upper=N_driver> dNO_CEN[N_censored];
+
+real<lower=0> cum_UNcen[N_uncensored];
+real<lower=0> cum_CEN[N_censored];
+
+real<lower=0> censor_time[N_censored];
+real<lower=0> t_uncensored[N_uncensored];
+}
+parameters {
+real<lower=0> r;
+real b0[N_driver];
+real b1[N_driver];
+real<lower=1> t_censored[N_censored]; 
+real mu0;
+real mu1;
+real<lower=0> sigma0;
+real<lower=0> sigma1;
+}
+
+model {
+for (i in 1:N_uncensored) {
+t_uncensored[i] ~ weibull(r, exp(-(b0[dNO_UNcen[i]] + b1[dNO_UNcen[i]]*cum_UNcen[i])/ r));
+}
+for (j in 1:N_censored) {
+t_censored[j] ~ weibull(r, exp(-(mu0 + b0[dNO_CEN[j]]*sigma0 + (mu1 + b1[dNO_CEN[j]]*sigma1)*cum_CEN[j]) / r) / censor_time[j]);
+}
+r ~ gamma(1, 1);
+b0 ~ normal(0, 1);
+b1 ~ normal(0, 1);
+mu0 ~ normal(0, 10);
+mu1 ~ normal(0, 10);
+sigma0 ~ gamma(1, 1);
+sigma1 ~ gamma(1, 1);
+}
+"
+
+UNcensweibull = weibDat %>% filter(!is.na(CEno_1))
+censorweibull = weibDat %>% filter(is.na(CEno_1))
+
+
+datstan = list(N_uncensored = nrow(UNcensweibull),
+               N_censored = nrow(censorweibull),
+               N_driver = max(max(UNcensweibull$driver_num),
+                              max(censorweibull$driver_num)),
+               dNO_UNcen = UNcensweibull$driver_num,
+               dNO_CEN = censorweibull$driver_num,
+               cum_UNcen = UNcensweibull$drivetime_cum,
+               cum_CEN = censorweibull$drivetime_cum,
+               censor_time = censorweibull$travelTime,
+               t_uncensored = UNcensweibull$t_to_CE)
+
+weibullfit <- stan(model_code=weibullstan, model_name="WeibullReg", data=datstan, iter=100,warmup = 50, chains=1, init_r = 0.5)
+
 
 ```
 

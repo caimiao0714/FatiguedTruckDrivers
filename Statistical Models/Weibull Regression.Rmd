@@ -19,7 +19,7 @@ linkcolor: blue
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(eval = F)
+knitr::opts_chunk$set(eval = T, cache = T, message = F)
 ```
 
 # Weibull Distribution
@@ -55,87 +55,40 @@ Y_{i, d(i), s(i)} & \sim \text{WEIBULL}(\kappa, \theta) \\
 
 Where the $\theta$ is the scale parameter and $\kappa$ is the shape parameter. When $\kappa > 1$, the hazard of having critical event is increasing as cumulative driving time gets longer, which indicates fatigued driving. When $\kappa = 1$, the Weibull distribution becomes an exponential distribution with constant hazard $\frac{1}{\theta}$, which indicates no fatigue. When $0 < \kappa < 1$, the hazard of having critical events is decreasing with longer cumulative driving time, which indicates anti-fatigue, or burn-in.
 
+In essense, Stan is evaluating a log probability function (probability density function or probability mass function) for a given set of parameters; this function returns the log density of the posterior up to an additive constant.
 
+In this example, we
 
 
 # Examples
 
-This is an example of Weibull regression provided by [the STAN forum](https://discourse.mc-stan.org/t/weibull-regression/6098). 
+This is the Mice example of Weibull regression, originally provided in WinBUGS example models, and then provided by [the STAN forum](https://discourse.mc-stan.org/t/weibull-regression/6098). 
 
-## Example code 1
+## Data
 
-```{r exp1}
+```{r data}
 rm(list=ls(all=TRUE))
-require(foreign)
 require(rstan)
-require(MASS)
-require(VGAM)
-require(loo)
+require(shinystan)
 
-time <- c(6, 6, 6, 6, 7, 9, 10, 10, 11, 13, 16, 17, 19, 20, 22, 23, 25, 32, 32, 34, 35,
-          1, 1, 2, 2, 3, 4, 4, 5, 5, 8, 8, 8, 8, 11, 11, 12, 12, 15, 17, 22, 23)
-drug <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-status <- c(0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
-
-N_uncensored <- sum(status == 1)
-N_censored <- sum(status == 0)
-
-group_uncensored <- drug[status == 1] + 1
-group_censored <- drug[status == 0] + 1
-
-t_uncensored <- time[status == 1]
-censor_time <- time[status == 0]
-M = 2
-
-#------------------------------------------------------------------------------
-# THE MODEL. 
-
-modelString = "
-data {
-int<lower=0> N_uncensored;
-int<lower=0> N_censored;
-int<lower=0> M;
-int<lower=1,upper=M> group_uncensored[N_uncensored];
-int<lower=1,upper=M> group_censored[N_censored];
-real<lower=0> censor_time[N_censored];
-real<lower=0> t_uncensored[N_uncensored];
-}
-
-parameters {
-real<lower=0> r;
-real beta[M];
-//  t_censored / censor_time 
-real<lower=1> t2_censored[N_censored]; 
-}
-
-model {
-r ~ exponential(0.001);
-beta ~ normal(0, 100);
-for (n in 1:N_uncensored) {
-t_uncensored[n] ~ weibull(r, exp(-beta[group_uncensored[n]] / r));
-}
-for (n in 1:N_censored) {
-t2_censored[n] ~ weibull(r, exp(-beta[group_censored[n]] / r) / censor_time[n]);
-}
-}
-
-generated quantities {
-real median[M];
-real drug;
-// real veh_control;
-
-for (m in 1:M)
-median[m] = pow(log(2) * exp(-beta[m]), 1/r);
-drug = beta[2] - beta[1];
-}
-
-" # close quote for modelstring
-writeLines(modelString,con="model.txt")
-
-#------------------------------------------------------------------------------
-# THE DATA.
+N_uncensored <- 65L
+N_censored <- 15L
+M <- 4
+group_uncensored <-
+c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 
+2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 
+3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 
+4, 4, 4)
+group_censored <-
+c(1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4)
+t_uncensored <-
+c(12, 17, 21, 25, 11, 26, 27, 30, 13, 12, 21, 20, 23, 25, 23, 
+29, 35, 31, 36, 32, 27, 23, 12, 18, 38, 29, 30, 32, 25, 30, 37, 
+27, 22, 26, 28, 19, 15, 12, 35, 35, 10, 22, 18, 12, 31, 24, 37, 
+29, 27, 18, 22, 13, 18, 29, 28, 16, 22, 26, 19, 17, 28, 26, 12, 
+17, 26)
+censor_time <-
+c(40, 40, 40, 40, 40, 40, 40, 40, 10, 24, 40, 40, 20, 29, 10)
 
 dataList = list(
   N_censored = N_censored , 
@@ -146,212 +99,122 @@ dataList = list(
   censor_time = censor_time,
   t_uncensored = t_uncensored
 )
-
-#------------------------------------------------------------------------------
-# INTIALIZE THE CHAINS.
-# glmInfo = lm( dataList$y ~ dataList$x) # R func.
-# show( glmInfo ) ; flush.console() # display in case glm() has troubles
-# b0Init = glmInfo$coef[1] 
-# bInit = glmInfo$coef[-1] 
-# should use those from ordered logit to start with
-if (FALSE) {
-  threshInit = myologit$zeta
-  bInit = myologit$coefficients
-  initsList =  list( 
-    b = bInit, 
-    thresh = threshInit )
-}
-
-#------------------------------------------------------------------------------
-# RUN THE CHAINS
-
-parameters = c("beta", "drug")  # The parameter(s) to be monitored.
-adaptSteps = 500              # Number of steps to "tune" the samplers.
-burnInSteps = 500            # Number of steps to "burn-in" the samplers.
-nChains = 3                   # Number of chains to run.
-initsChains <- list()
-
-if (FALSE) {
-  for (i in 1:nChains) {
-    initsChains[[i]] <- initsList
-  }
-}
-
-numSavedSteps=6000           # Total number of steps in chains to save.
-thinSteps=1                   # Number of steps to "thin" (1=keep every step).
-nPerChain = ceiling( ( numSavedSteps * thinSteps ) / nChains ) # Steps per chain.
-
-# Burn-in:
-cat( "Burning in the MCMC chain...\n" )
-
-# The saved MCMC chain:
-cat( "Sampling final MCMC chain...\n" )
-
-time.used <- proc.time()
-mcmcSamples <- stan(model_code=modelString, data=dataList, seed = 47306, 
-                    pars=parameters, chains=nChains, # init=initsChains, 
-                    iter=nPerChain, 
-                    warmup=burnInSteps ) # init=initsChains
-summary(mcmcSamples)
-print(mcmcSamples)
-# mcmcChain = as.matrix(mcmcSamples)
-# Stop the clock
-proc.time() - time.used
-if (FALSE) {
-  log_lik <- extract_log_lik(mcmcSamples)
-  waic(log_lik)
-  loo(log_lik)
-  save.image("bayesGologitMod01aStan.Rdata")
-  sink()
-}
-
 ```
 
+## Official code provide by the Stan team
 
-## Example code 2
-
-```{r exp2}
-
-rm(list=ls(all=TRUE))
-require(foreign)
-require(rstan)
-require(MASS)
-require(VGAM)
-require(loo)
-
-time <- c(6, 6, 6, 6, 7, 9, 10, 10, 11, 13, 16, 17, 19, 20, 22, 23, 25, 32, 32, 34, 35,
-            1, 1, 2, 2, 3, 4, 4, 5, 5, 8, 8, 8, 8, 11, 11, 12, 12, 15, 17, 22, 23)
-drug <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-status <- c(0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
-
-N_uncensored <- sum(status == 1)
-N_censored <- sum(status == 0)
-
-group_uncensored <- drug[status == 1] 
-group_censored <- drug[status == 0] 
-
-t_uncensored <- time[status == 1]
-censor_time <- time[status == 0]
-M = 1
-
-#------------------------------------------------------------------------------
-# THE MODEL. 
-
-modelString = "
+```{r OfficialCode}
+mice1 = "
 data {
   int<lower=0> N_uncensored;
   int<lower=0> N_censored;
   int<lower=0> M;
-  int<lower=0,upper=1> group_uncensored[N_uncensored];
-  int<lower=0,upper=1> group_censored[N_censored];
+  int<lower=1,upper=M> group_uncensored[N_uncensored];
+  int<lower=1,upper=M> group_censored[N_censored];
   real<lower=0> censor_time[N_censored];
   real<lower=0> t_uncensored[N_uncensored];
 }
 
 parameters {
   real<lower=0> r;
-  vector[M] beta;
-  //  t_censored / censor_time 
-  real<lower=1> t2_censored[N_censored]; 
+  real beta[M];
+  real<lower=1> t2_censored[N_censored]; // t_censored / censor_time 
 }
 
 model {
   r ~ exponential(0.001);
   beta ~ normal(0, 100);
   for (n in 1:N_uncensored) {
-    t_uncensored[n] ~ weibull(r, exp(-beta*group_uncensored[n] / r));
+    t_uncensored[n] ~ weibull(r, exp(-beta[group_uncensored[n]] / r));
   }
   for (n in 1:N_censored) {
-    t2_censored[n] ~ weibull(r, exp(-beta*group_censored[n] / r) / censor_time[n]);
+    t2_censored[n] ~ weibull(r, exp(-beta[group_censored[n]] / r) / censor_time[n]);
   }
 }
 
 generated quantities {
   real median[M];
-  real drug;
-  // real veh_control;
-
+  real pos_control;
+  real test_sub;
+  real veh_control;
+  
   for (m in 1:M)
-  median[m] = pow(log(2) * exp(-beta[m]), 1/r);
+    median[m] <- pow(log(2) * exp(-beta[m]), 1/r);
+  
+  veh_control <- beta[2] - beta[1];
+  test_sub    <- beta[3] - beta[1];
+  pos_control <- beta[4] - beta[1];
+}
+" 
+
+miceHMM1 <- stan(model_code=mice1, data=dataList, seed = 47306, chains=4,  
+                    iter=5000, 
+                    warmup=2000 ) # init=initsChains
+```
+
+```{r result1}
+knitr::kable(summary(miceHMM1), 
+             digits = 2,
+             caption = 'Summary statistics by the official Stan team')
+```
+
+
+## Code by Miao
+
+```{r MiaoCode}
+miao = "
+data {
+  int<lower=0> N_uncensored;
+  int<lower=0> N_censored;
+  int<lower=0> M;
+  int<lower=1,upper=M> group_uncensored[N_uncensored];
+  int<lower=1,upper=M> group_censored[N_censored];
+  real<lower=0> censor_time[N_censored];
+  real<lower=0> t_uncensored[N_uncensored];
 }
 
-" # close quote for modelstring
-writeLines(modelString,con="model.txt")
-
-#------------------------------------------------------------------------------
-# THE DATA.
-
-dataList = list(
-  N_censored = N_censored , 
-  N_uncensored = N_uncensored , # BUGS does not treat 1-column mat as vector
-  M = M ,
-  group_uncensored = group_uncensored ,
-  group_censored = group_censored,
-  censor_time = censor_time,
-  t_uncensored = t_uncensored
-)
-
-#------------------------------------------------------------------------------
-# INTIALIZE THE CHAINS.
-# glmInfo = lm( dataList$y ~ dataList$x) # R func.
-# show( glmInfo ) ; flush.console() # display in case glm() has troubles
-# b0Init = glmInfo$coef[1] 
-# bInit = glmInfo$coef[-1] 
-# should use those from ordered logit to start with
-if (FALSE) {
-  threshInit = myologit$zeta
-  bInit = myologit$coefficients
-  initsList =  list( 
-    b = bInit, 
-    thresh = threshInit )
+parameters{
+  real<lower=0> r;
+  vector[M] beta;
 }
 
-#------------------------------------------------------------------------------
-# RUN THE CHAINS
-
-parameters = c("beta")  # The parameter(s) to be monitored.
-adaptSteps = 500              # Number of steps to "tune" the samplers.
-burnInSteps = 500            # Number of steps to "burn-in" the samplers.
-nChains = 3                   # Number of chains to run.
-initsChains <- list()
-
-if (FALSE) {
-for (i in 1:nChains) {
-  initsChains[[i]] <- initsList
-}
+model{
+  for (i in 1:N_uncensored){
+    t_uncensored[i] ~ weibull(r, exp(-beta[group_uncensored[i]] / r));
+  }
+  for (j in 1:N_censored){
+    target += weibull_lccdf(censor_time[j]|r, exp(-beta[group_censored[j]] / r));
+  }
+  
+  r ~ gamma(1, 1);
+  beta ~ normal(0, 100);
+  
 }
 
-numSavedSteps=6000           # Total number of steps in chains to save.
-thinSteps=1                   # Number of steps to "thin" (1=keep every step).
-nPerChain = ceiling( ( numSavedSteps * thinSteps ) / nChains ) # Steps per chain.
-
-# Burn-in:
-cat( "Burning in the MCMC chain...\n" )
-
-# The saved MCMC chain:
-cat( "Sampling final MCMC chain...\n" )
-
-time.used <- proc.time()
-mcmcSamples <- stan(model_code=modelString, data=dataList, seed = 47306, 
-                    pars=parameters, chains=nChains, # init=initsChains, 
-                    iter=nPerChain, 
-                    warmup=burnInSteps ) # init=initsChains
-summary(mcmcSamples)
-print(mcmcSamples)
-# mcmcChain = as.matrix(mcmcSamples)
-# Stop the clock
-proc.time() - time.used
-if (FALSE) {
-  log_lik <- extract_log_lik(mcmcSamples)
-  waic(log_lik)
-  loo(log_lik)
-  save.image("bayesGologitMod01aStan.Rdata")
-  sink()
+generated quantities {
+  real median[M];
+  real pos_control;
+  real test_sub;
+  real veh_control;
+  
+  for (m in 1:M)
+    median[m] <- pow(log(2) * exp(-beta[m]), 1/r);
+  
+  veh_control <- beta[2] - beta[1];
+  test_sub    <- beta[3] - beta[1];
+  pos_control <- beta[4] - beta[1];
 }
+"
 
 
+miceHMM <- stan(model_code=miao, data=dataList, seed = 47306, chains=4,  
+                    iter=5000, 
+                    warmup=2000 ) # init=initsChains
+```
 
+```{r result2}
+knitr::kable(summary(miceHMM),
+             digits = 2,
+             caption = 'Summary statistics by Miao')
 ```
 
