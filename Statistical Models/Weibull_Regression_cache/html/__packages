@@ -4,3 +4,5 @@ StanHeaders
 rstan
 shiny
 shinystan
+magrittr
+kableExtra

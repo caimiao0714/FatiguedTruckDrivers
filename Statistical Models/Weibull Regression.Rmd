@@ -19,7 +19,7 @@ linkcolor: blue
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(eval = T, cache = T)
+knitr::opts_chunk$set(eval = T, cache = T, message = F)
 ```
 
 # Weibull Distribution
@@ -101,7 +101,7 @@ for (i in 1:N){
 
 # Examples
 
-This is the Mice example of Weibull regression, originally provided in WinBUGS example models, and then provided by [the STAN forum](https://discourse.mc-stan.org/t/weibull-regression/6098). 
+This is the Mice example of Weibull regression, originally provided in [WinBUGS code](http://www.openbugs.net/Examples/Mice.html), and then rewrote by the Stan team on their [Github example  models](https://github.com/stan-dev/example-models/blob/master/bugs_examples/vol1/mice/mice.stan). 
 
 ## Data
 
@@ -139,6 +139,26 @@ dataList = list(
   t_uncensored = t_uncensored
 )
 ```
+
+The survival time for four treatment groups were observed. We split the observed data into two parts:
+
+- uncensored MICE survival data
+- censored MICE survival data
+
+```{r printData}
+require(magrittr)
+library(kableExtra)
+
+knitr::kable(list(data.frame(group_uncensored, t_uncensored),
+                  data.frame(group_censored, censor_time)), 
+             align = "c",
+             caption = c("uncensored MICE survival data",
+                         "censored MICE survival data")) %>%
+  kableExtra::kable_styling(bootstrap_options = "striped", 
+                            full_width = F, position = "left") %>% 
+  kableExtra::scroll_box(width = "100%", height = "300px")
+```
+
 
 ## Official code provide by the Stan team
 
@@ -191,10 +211,16 @@ miceHMM1 <- stan(model_code=mice1, data=dataList, seed = 47306, chains=4,
                     warmup=2000 ) # init=initsChains
 ```
 
+Notice that there are estimates for parameters `t2_censored[1]` to `t2_censored[15]` since this official Stan code is treating the censored data as parameters. The number of parameters for these censored values equals the number of censored values.
+
 ```{r result1}
 knitr::kable(summary(miceHMM1), 
              digits = 2,
-             caption = 'Summary statistics by the official Stan team')
+             caption = 'Summary statistics by the official Stan team',
+             align = 'c') %>% 
+  kableExtra::kable_styling(bootstrap_options = 
+                              c("striped", "hover", "condensed")) %>% 
+  kableExtra::scroll_box(width = "700px", height = "700px")
 ```
 
 
@@ -251,9 +277,15 @@ miceHMM <- stan(model_code=miao, data=dataList, seed = 47306, chains=4,
                     warmup=2000 ) # init=initsChains
 ```
 
+Notice in the Stan results here, there are not posterior distribution estimates for `t2_censored[1]` to `t2_censored[15]`. This is because we are integrating out these censored data, instead of treating them as parameters.
+
 ```{r result2}
 knitr::kable(summary(miceHMM),
              digits = 2,
-             caption = 'Summary statistics by Miao')
+             caption = 'Summary statistics by Miao',
+             align = 'c') %>% 
+  kableExtra::kable_styling(bootstrap_options = 
+                              c("striped", "hover", "condensed")) %>% 
+  kableExtra::scroll_box(width = "700px") 
 ```
 

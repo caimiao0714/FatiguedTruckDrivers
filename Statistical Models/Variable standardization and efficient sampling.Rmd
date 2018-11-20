@@ -1,0 +1,122 @@
+---
+title: "Variable standardization and efficient sampling"
+author: "Miao Cai <miao.cai@slu.edu>"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: readable
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = T)
+```
+
+# Simulate data
+
+
+
+```{r simulateData}
+n_var = 2
+cor_coef = 3
+n_obs = 1000
+mu1 = 0
+mu2 = 100
+vector_param = c(1, 100)
+
+m = matrix(cor_coef, nrow=2, ncol=n_var)
+diag(m) = c(1, 100)
+
+x_12 = MASS::mvrnorm(n_obs, mu = c(mu1, mu2), Sigma = m)
+
+
+mean(x_12[,1]); mean(x_12[,2])
+sd(x_12[,1]); sd(x_12[,2])
+
+cor(x_12[,1], x_12[,2])# correlation coefficient
+
+plot(x_12[,1], x_12[,2], 
+     xlab = "x1", ylab = "x2",
+     main = "scatter plot of x2 versus x1")
+
+epsilon = rnorm(n = n_obs, 0, 1)
+
+y = x_12 %*% vector_param + epsilon
+
+dat = as.data.frame(cbind(y, x_12))
+names(dat) = c('y', 'x1', 'x2')
+```
+
+# HMC without standardization
+
+```{r hmcNOstandization, results = "hide"}
+require(rstan)
+
+hmcNOstandization = "
+data {
+  int<lower=0> N;
+  vector[N] y;
+  vector[N] x1;
+  vector[N] x2;
+}
+
+parameters{
+  real b1;
+  real b2;
+  real<lower=0> sigma;
+}
+
+model{
+  y ~ normal( b1 * x1 + b2 * x2, sigma );
+  
+  b1 ~ normal(0, 100);
+  b2 ~ normal(0, 100);
+  sigma ~ gamma(1, 1);
+}
+"
+
+dat1 = list(
+  N = nrow(dat), 
+  y = dat$y, 
+  x1 = dat$x1,
+  x2 = dat$x2
+)
+
+HMC1 <- stan(model_code=hmcNOstandization, 
+             data=dat1, seed = 47306, chains=4,
+             iter=3000, warmup=500 )
+```
+
+```{r print1}
+summary(HMC1)
+```
+
+
+# HMC after standardization
+
+```{r HMC2}
+dat1 = list(
+  N = nrow(dat), 
+  y = (dat$y - mean(dat$y))/sd(dat$y), 
+  x1 = (dat$x1 - mean(dat$x1))/sd(dat$x1),
+  x2 = (dat$x2 - mean(dat$x2))/sd(dat$x2)
+)
+
+HMC2 <- stan(model_code=hmcNOstandization, 
+             data=dat1, seed = 47306, chains=4,
+             iter=3000, warmup=500 )
+```
+
+```{r print2}
+summary(HMC2)$summary
+```
+
+Compare the number of effective sample size
+
+```{r compare}
+rbind(summary(HMC1)$summary,
+summary(HMC2)$summary)
+```
+
