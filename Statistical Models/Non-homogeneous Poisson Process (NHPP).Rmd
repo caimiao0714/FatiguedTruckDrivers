@@ -52,14 +52,16 @@ $$\lambda(t) = \lim_{\Delta t \rightarrow 0} \frac{P(N(t, t + \Delta t) \geq 1)}
 
 When the intensity function of a NHPP has the form $\lambda(t) = (\beta / \theta)(t/\theta)^{\beta - 1}$, where $\beta > 0$ and $\theta > 0$, the process is called **power law process** (PLP).
 
-## Likelihood
+1. **Failure truncation**: When testing stops after a predetermined number of failures, the data are said to be failure truncated.
+2. **Time truncation**: Data are said to be time truncated when testing stops at a predetermined time $t$.
 
-### Conditional probability
-
+**Conditional probability**
 \begin{align*}
 P(A \cap B) & = P(A)P(B|A) \\
 P(A \cap B \cap C) & = P(A)P(B|A)P(C|A \cap B)
 \end{align*}
+
+## Failure Truncated Case
 
 ### The first event
 
@@ -94,7 +96,8 @@ $$f_1(t_1) = \frac{\beta}{\theta}(\frac{t_1}{\theta})^{\beta - 1}e^{-(\frac{t_1}
 This pdf is identical with the pdf of Weibull distribution, so we have:
 $$T_1 \sim \text{Weibull}(\beta, \theta)$$
 
-## The second event
+
+### The second event
 
 The Survival function of the second event given the first event occurred at $t_2$ is:
 
@@ -116,10 +119,40 @@ f(t_2|t_1) & = - \frac{d}{dt_2}S_2(t_2)\\
 \end{align}
 
 
-## all events
+### all events
 
 \begin{align}
-f(t_1, t_2, \dots, t_n) & = f(t_1)f(t_2|t_1)f(t_3|t_1, t_2) \dots f(t_n|t_1, t_2, \dots, t_{n - 1}) \\
-& = \lambda (t_1)e^{-\int_{0}^{t_1}\lambda (u)du} 
+f(t_1, t_2, \cdots, t_n) & = f(t_1)f(t_2|t_1)f(t_3|t_1, t_2) \cdots f(t_n|t_1, t_2, \dots, t_{n - 1}) \\
+& = \lambda (t_1)e^{-\int_{0}^{t_1} \dot \lambda (u)du}\lambda (t_2)e^{-\int_{t_1}^{t_2} \dot \lambda (u)du}\cdots\lambda (t_n)e^{-\int_{t_{n-1}}^{t_n}\lambda (u)du}\\
+& = \Big(\prod_{i=1}^n\lambda(t_i)\Big)e^{-\int_0^t\lambda(u)du}\\
+& = \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big)e^{-(t_n/\theta)^\beta}, \quad t_1 < t_2 < \cdots < t_n
 \end{align}
 
+
+## Time Truncated Case
+
+### Conditional likelihood function
+
+We assume that the truncated time is $\tau$. The derivation of $f(t_1, t_2, \cdots, t_n|n)$ is messy in math, we directly give the conclusion here:
+
+$$f(t_1, t_2, \cdots, t_n|n) = n!\prod_{i=1}^n\frac{\lambda(t_i)}{\Lambda(\tau)}$$
+
+### Joint likelihood function
+
+Therefore, the joint likelihood function for $f(n, t_1, t_2, \cdots, t_n)$ is:
+
+\begin{align}
+f(n, t_1, t_2, \cdots, t_n) & = f(n)f(t_1, t_2, \cdots, t_n|n)\\
+& = \frac{e^{-\int_0^\tau \lambda(u)du}[\int_0^\tau \lambda(u)du]^n}{n!}n!\frac{\prod_{i=1}^n\lambda(t_i)}{[\Lambda(\tau)]^n}\\
+& = \Big(\prod_{i=1}^n\lambda(t_i) \Big)e^{-\int_0^\tau \lambda(u)du}\\
+& = \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1} \Big)e^{-(\tau/\theta)^\beta},\\ 
+n & = 0, 1, 2, \cdots, \quad  0 < t_1 < t_2 < \cdots < t_n
+\end{align}
+
+### Log likelihood function
+
+The log likelihood function $l$ is then:
+
+\begin{align}
+l & = \Big(\sum_{i=1}^n\log\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big) - (\frac{\tau}{\theta})^\beta
+\end{align}

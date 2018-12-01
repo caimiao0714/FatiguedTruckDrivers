@@ -252,18 +252,20 @@ fit = stan()</code></pre>
 <p><span class="math display">\[\lambda(t) = \lim_{\Delta t \rightarrow 0} \frac{P(N(t, t + \Delta t) \geq 1)}{\Delta t}\]</span></p>
 <p><strong>Nonhomogeneous Poisson Process</strong> The Nonhomogeneous Poisson Process (NHPP) is a Poisson process whose intensity function is non-constant.</p>
 <p>When the intensity function of a NHPP has the form <span class="math inline">\(\lambda(t) = (\beta / \theta)(t/\theta)^{\beta - 1}\)</span>, where <span class="math inline">\(\beta &gt; 0\)</span> and <span class="math inline">\(\theta &gt; 0\)</span>, the process is called <strong>power law process</strong> (PLP).</p>
-</div>
-<div id="likelihood" class="section level2">
-<h2><span class="header-section-number">3.2</span> Likelihood</h2>
-<div id="conditional-probability" class="section level3">
-<h3><span class="header-section-number">3.2.1</span> Conditional probability</h3>
+<ol style="list-style-type: decimal">
+<li><strong>Failure truncation</strong>: When testing stops after a predetermined number of failures, the data are said to be failure truncated.</li>
+<li><strong>Time truncation</strong>: Data are said to be time truncated when testing stops at a predetermined time <span class="math inline">\(t\)</span>.</li>
+</ol>
+<strong>Conditional probability</strong>
 <span class="math display">\[\begin{align*}
 P(A \cap B) &amp; = P(A)P(B|A) \\
 P(A \cap B \cap C) &amp; = P(A)P(B|A)P(C|A \cap B)
 \end{align*}\]</span>
 </div>
+<div id="failure-truncated-case" class="section level2">
+<h2><span class="header-section-number">3.2</span> Failure Truncated Case</h2>
 <div id="the-first-event" class="section level3">
-<h3><span class="header-section-number">3.2.2</span> The first event</h3>
+<h3><span class="header-section-number">3.2.1</span> The first event</h3>
 <p>The cumulative density function (cdf) of time to the first event is <span class="math inline">\(F(t_1)\)</span>: <span class="math inline">\(F_1(t_1) = P(T_1 \leq t_1) = 1 - S(t_1)\)</span>.</p>
 <p>The survival function for the first event <span class="math inline">\(S_1(t_1)\)</span> is:</p>
 <span class="math display">\[\begin{align*}
@@ -285,9 +287,8 @@ f_1(t_1) &amp; = \frac{d}{dt_1}F_1(t_1)\\
 <p><span class="math display">\[f_1(t_1) = \frac{\beta}{\theta}(\frac{t_1}{\theta})^{\beta - 1}e^{-(\frac{t_1}{\theta})^\beta}, \quad t_1 &gt; 0\]</span></p>
 <p>This pdf is identical with the pdf of Weibull distribution, so we have: <span class="math display">\[T_1 \sim \text{Weibull}(\beta, \theta)\]</span></p>
 </div>
-</div>
-<div id="the-second-event" class="section level2">
-<h2><span class="header-section-number">3.3</span> The second event</h2>
+<div id="the-second-event" class="section level3">
+<h3><span class="header-section-number">3.2.2</span> The second event</h3>
 <p>The Survival function of the second event given the first event occurred at <span class="math inline">\(t_2\)</span> is:</p>
 <span class="math display">\[\begin{align}
 S_2(t_2 | t_1) &amp; = P(T_2 &gt; t_2 | T_1 = t)\\
@@ -304,12 +305,41 @@ f(t_2|t_1) &amp; = - \frac{d}{dt_2}S_2(t_2)\\
 &amp; = \frac{\frac{\beta}{\theta}(\frac{t_2}{\theta})^{\beta - 1}e^{-(\frac{t_2}{\theta})^\beta }}{e^{- (\frac{t_1}{\theta})^\beta}}, \quad t_2 &gt; t_1
 \end{align}\]</span>
 </div>
-<div id="all-events" class="section level2">
-<h2><span class="header-section-number">3.4</span> all events</h2>
+<div id="all-events" class="section level3">
+<h3><span class="header-section-number">3.2.3</span> all events</h3>
 <span class="math display">\[\begin{align}
-f(t_1, t_2, \dots, t_n) &amp; = f(t_1)f(t_2|t_1)f(t_3|t_1, t_2) \dots f(t_n|t_1, t_2, \dots, t_{n - 1}) \\
-&amp; = \lambda (t_1)e^{-\int_{0}^{t_1}\lambda (u)du} 
+f(t_1, t_2, \cdots, t_n) &amp; = f(t_1)f(t_2|t_1)f(t_3|t_1, t_2) \cdots f(t_n|t_1, t_2, \dots, t_{n - 1}) \\
+&amp; = \lambda (t_1)e^{-\int_{0}^{t_1} \dot \lambda (u)du}\lambda (t_2)e^{-\int_{t_1}^{t_2} \dot \lambda (u)du}\cdots\lambda (t_n)e^{-\int_{t_{n-1}}^{t_n}\lambda (u)du}\\
+&amp; = \Big(\prod_{i=1}^n\lambda(t_i)\Big)e^{-\int_0^t\lambda(u)du}\\
+&amp; = \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big)e^{-(t_n/\theta)^\beta}, \quad t_1 &lt; t_2 &lt; \cdots &lt; t_n
 \end{align}\]</span>
+</div>
+</div>
+<div id="time-truncated-case" class="section level2">
+<h2><span class="header-section-number">3.3</span> Time Truncated Case</h2>
+<div id="conditional-likelihood-function" class="section level3">
+<h3><span class="header-section-number">3.3.1</span> Conditional likelihood function</h3>
+<p>We assume that the truncated time is <span class="math inline">\(\tau\)</span>. The derivation of <span class="math inline">\(f(t_1, t_2, \cdots, t_n|n)\)</span> is messy in math, we directly give the conclusion here:</p>
+<p><span class="math display">\[f(t_1, t_2, \cdots, t_n|n) = n!\prod_{i=1}^n\frac{\lambda(t_i)}{\Lambda(\tau)}\]</span></p>
+</div>
+<div id="joint-likelihood-function" class="section level3">
+<h3><span class="header-section-number">3.3.2</span> Joint likelihood function</h3>
+<p>Therefore, the joint likelihood function for <span class="math inline">\(f(n, t_1, t_2, \cdots, t_n)\)</span> is:</p>
+<span class="math display">\[\begin{align}
+f(n, t_1, t_2, \cdots, t_n) &amp; = f(n)f(t_1, t_2, \cdots, t_n|n)\\
+&amp; = \frac{e^{-\int_0^\tau \lambda(u)du}[\int_0^\tau \lambda(u)du]^n}{n!}n!\frac{\prod_{i=1}^n\lambda(t_i)}{[\Lambda(\tau)]^n}\\
+&amp; = \Big(\prod_{i=1}^n\lambda(t_i) \Big)e^{-\int_0^\tau \lambda(u)du}\\
+&amp; = \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1} \Big)e^{-(\tau/\theta)^\beta},\\ 
+n &amp; = 0, 1, 2, \cdots, \quad  0 &lt; t_1 &lt; t_2 &lt; \cdots &lt; t_n
+\end{align}\]</span>
+</div>
+<div id="log-likelihood-function" class="section level3">
+<h3><span class="header-section-number">3.3.3</span> Log likelihood function</h3>
+<p>The log likelihood function <span class="math inline">\(l\)</span> is then:</p>
+<span class="math display">\[\begin{align}
+l &amp; = \Big(\sum_{i=1}^n\log\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big) - (\frac{\tau}{\theta})^\beta
+\end{align}\]</span>
+</div>
 </div>
 </div>
 
