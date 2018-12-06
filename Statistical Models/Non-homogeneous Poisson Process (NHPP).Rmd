@@ -1,15 +1,18 @@
 ---
 title: "Non-homogeneous Poisson Process (NHPP)"
 author: "Miao Cai"
-date: "November 28, 2018"
+date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    toc: no
+    number_sections: yes
   html_document:
-    theme: readable
+    cold_folding: yes
     df_print: paged
-    toc: true
-    toc_float: true
-    number_sections: true
-    cold_folding: true
+    number_sections: yes
+    theme: readable
+    toc: yes
+    toc_float: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -19,21 +22,6 @@ knitr::opts_chunk$set(echo = TRUE, eval = F)
 
 # Non-homogeneous Poisson Process - essential part for Stan
 
-%{stan output.var=nhpp}%
-
-```
-data{
-
-}
-model{
-
-}
-```
-
-```{r}
-library(rstan)
-fit = stan()
-```
 
 
 # Real data example
@@ -101,32 +89,32 @@ $$T_1 \sim \text{Weibull}(\beta, \theta)$$
 
 The Survival function of the second event given the first event occurred at $t_2$ is:
 
-\begin{align}
+\begin{align*}
 S_2(t_2 | t_1) & = P(T_2 > t_2 | T_1 = t)\\
 & = P(N(t_1, t_2) = 0|T_1 = t_1) \\
-& = e^{-\int_{t_1}^{t_2}\lambda_{u}du}[\int_{t_1}^{t_2}\lambda_{u}du]^0/0!
+& = e^{-\int_{t_1}^{t_2}\lambda_{u}du}[\int_{t_1}^{t_2}\lambda_{u}du]^0/0!\\
 & = e^{-\int_{t_1}^{t_2}\lambda_{u}du}
-\end{align}
+\end{align*}
 
 The we can derive the pdf of $t_2$ conditioned on $t_1$
 
-\begin{align}
+\begin{align*}
 f(t_2|t_1) & = - \frac{d}{dt_2}S_2(t_2)\\
 & = - \frac{d}{dt_2}e^{-\int_{t_1}^{t_2}\lambda(u)du}\\
 & = \lambda(t_2)e^{-\int_{t_1}^{t_2}\lambda(u)du}\\
 & = \frac{\beta}{\theta}(\frac{t_2}{\theta})^{\beta - 1}e^{-[(\frac{t_2}{\theta})^\beta - (\frac{t_1}{\theta})^\beta]}\\
-& = \frac{\frac{\beta}{\theta}(\frac{t_2}{\theta})^{\beta - 1}e^{-(\frac{t_2}{\theta})^\beta }}{e^{- (\frac{t_1}{\theta})^\beta}}, \quad t_2 > t_1
-\end{align}
+& = \frac{\frac{\beta}{\theta}(\frac{t_2}{\theta})^{\beta - 1}e^{-(t_2/\theta)^\beta }}{e^{- (t_1/\theta)^\beta}}, \quad t_2 > t_1
+\end{align*}
 
 
-### all events
+### All events
 
-\begin{align}
+\begin{align*}
 f(t_1, t_2, \cdots, t_n) & = f(t_1)f(t_2|t_1)f(t_3|t_1, t_2) \cdots f(t_n|t_1, t_2, \dots, t_{n - 1}) \\
 & = \lambda (t_1)e^{-\int_{0}^{t_1} \dot \lambda (u)du}\lambda (t_2)e^{-\int_{t_1}^{t_2} \dot \lambda (u)du}\cdots\lambda (t_n)e^{-\int_{t_{n-1}}^{t_n}\lambda (u)du}\\
 & = \Big(\prod_{i=1}^n\lambda(t_i)\Big)e^{-\int_0^t\lambda(u)du}\\
 & = \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big)e^{-(t_n/\theta)^\beta}, \quad t_1 < t_2 < \cdots < t_n
-\end{align}
+\end{align*}
 
 
 ## Time Truncated Case
@@ -141,18 +129,20 @@ $$f(t_1, t_2, \cdots, t_n|n) = n!\prod_{i=1}^n\frac{\lambda(t_i)}{\Lambda(\tau)}
 
 Therefore, the joint likelihood function for $f(n, t_1, t_2, \cdots, t_n)$ is:
 
-\begin{align}
+\begin{align*}
 f(n, t_1, t_2, \cdots, t_n) & = f(n)f(t_1, t_2, \cdots, t_n|n)\\
 & = \frac{e^{-\int_0^\tau \lambda(u)du}[\int_0^\tau \lambda(u)du]^n}{n!}n!\frac{\prod_{i=1}^n\lambda(t_i)}{[\Lambda(\tau)]^n}\\
 & = \Big(\prod_{i=1}^n\lambda(t_i) \Big)e^{-\int_0^\tau \lambda(u)du}\\
 & = \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1} \Big)e^{-(\tau/\theta)^\beta},\\ 
 n & = 0, 1, 2, \cdots, \quad  0 < t_1 < t_2 < \cdots < t_n
-\end{align}
+\end{align*}
 
 ### Log likelihood function
 
 The log likelihood function $l$ is then:
 
-\begin{align}
-l & = \Big(\sum_{i=1}^n\log\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big) - (\frac{\tau}{\theta})^\beta
-\end{align}
+\begin{align*}
+l & = \log \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big)e^{-(\tau/\theta)^\beta}\\
+& = \sum_{i=1}^n\log\Big(\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big) - (\frac{\tau}{\theta})^\beta\\
+& = n\log\beta - n\beta\log\theta + (\beta - 1)\sum_{i=1}^n\log t_i - (\frac{\tau}{\theta})^\beta
+\end{align*}

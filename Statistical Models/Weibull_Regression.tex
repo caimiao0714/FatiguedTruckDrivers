@@ -1,0 +1,871 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\PassOptionsToPackage{usenames,dvipsnames}{color} % color is loaded by hyperref
+\hypersetup{unicode=true,
+            pdftitle={Bayesian Hierarchical Weibull Regression},
+            pdfauthor={Miao Cai},
+            colorlinks=true,
+            linkcolor=blue,
+            citecolor=Blue,
+            urlcolor=Blue,
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\usepackage{graphicx,grffile}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\IfFileExists{parskip.sty}{%
+\usepackage{parskip}
+}{% else
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{5}
+% Redefines (sub)paragraphs to behave more like sections
+\ifx\paragraph\undefined\else
+\let\oldparagraph\paragraph
+\renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+\let\oldsubparagraph\subparagraph
+\renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+
+%%% Use protect on footnotes to avoid problems with footnotes in titles
+\let\rmarkdownfootnote\footnote%
+\def\footnote{\protect\rmarkdownfootnote}
+
+%%% Change title format to be more compact
+\usepackage{titling}
+
+% Create subtitle command for use in maketitle
+\newcommand{\subtitle}[1]{
+  \posttitle{
+    \begin{center}\large#1\end{center}
+    }
+}
+
+\setlength{\droptitle}{-2em}
+
+  \title{Bayesian Hierarchical Weibull Regression}
+    \pretitle{\vspace{\droptitle}\centering\huge}
+  \posttitle{\par}
+  \subtitle{JQT paper with 200 drivers - Model 3}
+  \author{Miao Cai\footnote{Department of Epidemiology and Biostatistics, Saint
+  Louis University. Email address \url{miao.cai@slu.edu}}}
+    \preauthor{\centering\large\emph}
+  \postauthor{\par}
+      \predate{\centering\large\emph}
+  \postdate{\par}
+    \date{2018-12-05}
+
+
+\begin{document}
+\maketitle
+
+\section{Weibull Distribution}\label{weibull-distribution}
+
+The probability density function of a Weibull distribution is \[
+f(t) = \begin{cases}
+\frac{\kappa}{\theta}\Big(\frac{t}{\theta}\Big)^{\kappa - 1}e^{(t/\theta)^\kappa}, & t>8 \\
+0, & t\leq 0
+\end{cases}
+\]
+
+Then the survival function is: \[
+S(t) = P(T > t) = 1 - P(T \leq t) = e^{-(t/\theta)^\kappa}
+\]
+
+The hazard function is the first order derivative of the survival
+function: \[
+h(t) = \frac{dS(t)}{dt} = \frac{\kappa}{\theta}\Big(\frac{t}{\theta}\Big)^{\kappa - 1}
+\]
+
+\section{Weibull regression}\label{weibull-regression}
+
+We assume \(Y_{i, d(i), s(i)}\) is the time until the first critical
+event from the start of a trip, then we have
+
+\begin{align*}
+Y_{i, d(i), s(i)} & \sim \text{WEIBULL}(\kappa, \theta) \\
+\theta & = \exp(\beta_{0, d(i)} + \beta_{1, d(i)} \cdot \text{CT}_i + \mathbf{\xi} \cdot \mathbf{W} + \mathbf{\nu} \cdot \mathbf{D_i})
+\end{align*}
+
+Where the \(\theta\) is the scale parameter and \(\kappa\) is the shape
+parameter. When \(\kappa > 1\), the hazard of having critical event is
+increasing as cumulative driving time gets longer, which indicates
+fatigued driving. When \(\kappa = 1\), the Weibull distribution becomes
+an exponential distribution with constant hazard \(\frac{1}{\theta}\),
+which indicates no fatigue. When \(0 < \kappa < 1\), the hazard of
+having critical events is decreasing with longer cumulative driving
+time, which indicates anti-fatigue, or burn-in.
+
+\section{Censoring in Stan}\label{censoring-in-stan}
+
+In essense, Stan is evaluating a log probability function (probability
+density function or probability mass function) for a given set of
+parameters; this function returns the log density of the posterior up to
+an additive constant.
+
+There are two ways of dealing with censoring in stan:
+
+\begin{itemize}
+\tightlist
+\item
+  estimating censored values
+\item
+  integrating out censored values
+\end{itemize}
+
+Estimating censored values in Stan is to treat these censored values as
+missing data with some constraint (lower bound, upper bound or
+interval). These censored values will be declared as parameters with
+constraints, and then estimated or imputed by their distribution.
+However, this way is not feasible when the censored data are huge, which
+leads to a huge amount parameters to be estimated.
+
+The other way to deal with censored data is integrating out the censored
+values. Let's assume the data are right censored, which is common in
+survival data analysis. The probability of each censored datum can be
+calculated as:
+
+\[
+P(t > C) = \int_C^\infty f(t|\kappa, \theta)dt = 1 - \Lambda(C|\kappa, \theta)
+\]
+
+Where \(f(t|\kappa, \theta)\) and \(\Lambda(t|\kappa, \theta)\) are the
+probability density function and cumulative density function of Weibull
+distribution.
+
+The log of total probability of \(N\) censored points is:
+
+\begin{equation}\label{ltotalpdf}
+\log \prod_{i = 1}^N P(t_i > C_i) = \sum_{i = 1}^N\log\Big(1 - \Lambda(C_i|\kappa, \theta)\Big)
+\end{equation}
+
+Stan provides \texttt{\textless{}distribution\textgreater{}\_lccdf} as
+the log of complementary CDF for built-in distributions, so
+\texttt{weibull\_lccdf} is the log of complementary CDF of weibull
+distribution. The Equation @ref(ltotalpdf) can be expressed as the
+following function in Stan:
+
+\begin{align*}
+\log \prod_{i = 1}^N P(t_i > C_i) & = \sum_{i = 1}^N \texttt{weibull_lccdf}(C_i|\kappa, \theta)
+\end{align*}
+
+When it is translated into Stan \texttt{model} block, it becomes:
+
+\begin{verbatim}
+for (i in 1:N){
+  target += weibull_lccdf(censored_time[i] | kappa, theta)
+}
+\end{verbatim}
+
+\section{Examples}\label{examples}
+
+This is the Mice example of Weibull regression, originally provided in
+\href{http://www.openbugs.net/Examples/Mice.html}{WinBUGS code}, and
+then rewrote by the Stan team on their
+\href{https://github.com/stan-dev/example-models/blob/master/bugs_examples/vol1/mice/mice.stan}{Github
+example models}.
+
+\subsection{Data}\label{data}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{#rm(list=ls(all=TRUE))}
+\KeywordTok{require}\NormalTok{(rstan)}
+\KeywordTok{require}\NormalTok{(shinystan)}
+
+\NormalTok{N_uncensored <-}\StringTok{ }\NormalTok{65L}
+\NormalTok{N_censored <-}\StringTok{ }\NormalTok{15L}
+\NormalTok{M <-}\StringTok{ }\DecValTok{4}
+\NormalTok{group_uncensored <-}
+\KeywordTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{2}\NormalTok{, }
+\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }
+\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }
+\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{)}
+\NormalTok{group_censored <-}
+\KeywordTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{)}
+\NormalTok{t_uncensored <-}
+\KeywordTok{c}\NormalTok{(}\DecValTok{12}\NormalTok{, }\DecValTok{17}\NormalTok{, }\DecValTok{21}\NormalTok{, }\DecValTok{25}\NormalTok{, }\DecValTok{11}\NormalTok{, }\DecValTok{26}\NormalTok{, }\DecValTok{27}\NormalTok{, }\DecValTok{30}\NormalTok{, }\DecValTok{13}\NormalTok{, }\DecValTok{12}\NormalTok{, }\DecValTok{21}\NormalTok{, }\DecValTok{20}\NormalTok{, }\DecValTok{23}\NormalTok{, }\DecValTok{25}\NormalTok{, }\DecValTok{23}\NormalTok{, }
+\DecValTok{29}\NormalTok{, }\DecValTok{35}\NormalTok{, }\DecValTok{31}\NormalTok{, }\DecValTok{36}\NormalTok{, }\DecValTok{32}\NormalTok{, }\DecValTok{27}\NormalTok{, }\DecValTok{23}\NormalTok{, }\DecValTok{12}\NormalTok{, }\DecValTok{18}\NormalTok{, }\DecValTok{38}\NormalTok{, }\DecValTok{29}\NormalTok{, }\DecValTok{30}\NormalTok{, }\DecValTok{32}\NormalTok{, }\DecValTok{25}\NormalTok{, }\DecValTok{30}\NormalTok{, }\DecValTok{37}\NormalTok{, }
+\DecValTok{27}\NormalTok{, }\DecValTok{22}\NormalTok{, }\DecValTok{26}\NormalTok{, }\DecValTok{28}\NormalTok{, }\DecValTok{19}\NormalTok{, }\DecValTok{15}\NormalTok{, }\DecValTok{12}\NormalTok{, }\DecValTok{35}\NormalTok{, }\DecValTok{35}\NormalTok{, }\DecValTok{10}\NormalTok{, }\DecValTok{22}\NormalTok{, }\DecValTok{18}\NormalTok{, }\DecValTok{12}\NormalTok{, }\DecValTok{31}\NormalTok{, }\DecValTok{24}\NormalTok{, }\DecValTok{37}\NormalTok{, }
+\DecValTok{29}\NormalTok{, }\DecValTok{27}\NormalTok{, }\DecValTok{18}\NormalTok{, }\DecValTok{22}\NormalTok{, }\DecValTok{13}\NormalTok{, }\DecValTok{18}\NormalTok{, }\DecValTok{29}\NormalTok{, }\DecValTok{28}\NormalTok{, }\DecValTok{16}\NormalTok{, }\DecValTok{22}\NormalTok{, }\DecValTok{26}\NormalTok{, }\DecValTok{19}\NormalTok{, }\DecValTok{17}\NormalTok{, }\DecValTok{28}\NormalTok{, }\DecValTok{26}\NormalTok{, }\DecValTok{12}\NormalTok{, }
+\DecValTok{17}\NormalTok{, }\DecValTok{26}\NormalTok{)}
+\NormalTok{censor_time <-}
+\KeywordTok{c}\NormalTok{(}\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{, }\DecValTok{10}\NormalTok{, }\DecValTok{24}\NormalTok{, }\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{, }\DecValTok{20}\NormalTok{, }\DecValTok{29}\NormalTok{, }\DecValTok{10}\NormalTok{)}
+
+\NormalTok{dataList =}\StringTok{ }\KeywordTok{list}\NormalTok{(}
+  \DataTypeTok{N_censored =}\NormalTok{ N_censored , }
+  \DataTypeTok{N_uncensored =}\NormalTok{ N_uncensored , }\CommentTok{# BUGS does not treat 1-column mat as vector}
+  \DataTypeTok{M =}\NormalTok{ M ,}
+  \DataTypeTok{group_uncensored =}\NormalTok{ group_uncensored ,}
+  \DataTypeTok{group_censored =}\NormalTok{ group_censored,}
+  \DataTypeTok{censor_time =}\NormalTok{ censor_time,}
+  \DataTypeTok{t_uncensored =}\NormalTok{ t_uncensored}
+\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+The survival time for four treatment groups were observed. We split the
+observed data into two parts:
+
+\begin{itemize}
+\tightlist
+\item
+  uncensored MICE survival data
+\item
+  censored MICE survival data
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{require}\NormalTok{(magrittr)}
+\KeywordTok{library}\NormalTok{(kableExtra)}
+
+\NormalTok{knitr}\OperatorTok{::}\KeywordTok{kable}\NormalTok{(}\KeywordTok{list}\NormalTok{(}\KeywordTok{data.frame}\NormalTok{(group_uncensored, t_uncensored),}
+                  \KeywordTok{data.frame}\NormalTok{(group_censored, censor_time)), }
+             \DataTypeTok{align =} \StringTok{"c"}\NormalTok{,}
+             \DataTypeTok{caption =} \KeywordTok{c}\NormalTok{(}\StringTok{"uncensored MICE survival data"}\NormalTok{,}
+                         \StringTok{"censored MICE survival data"}\NormalTok{)) }\OperatorTok{%>%}
+\StringTok{  }\NormalTok{kableExtra}\OperatorTok{::}\KeywordTok{kable_styling}\NormalTok{(}\DataTypeTok{bootstrap_options =} \StringTok{"striped"}\NormalTok{, }
+                            \DataTypeTok{full_width =}\NormalTok{ F, }\DataTypeTok{position =} \StringTok{"left"}\NormalTok{) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\NormalTok{kableExtra}\OperatorTok{::}\KeywordTok{scroll_box}\NormalTok{(}\DataTypeTok{width =} \StringTok{"110%"}\NormalTok{, }\DataTypeTok{height =} \StringTok{"300px"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{table}
+\caption{\label{tab:printData}uncensored MICE survival data}
+\caption{\label{tab:printData}censored MICE survival data}
+
+\begin{tabular}[t]{c|c}
+\hline
+group\_uncensored & t\_uncensored\\
+\hline
+1 & 12\\
+\hline
+1 & 17\\
+\hline
+1 & 21\\
+\hline
+1 & 25\\
+\hline
+1 & 11\\
+\hline
+1 & 26\\
+\hline
+1 & 27\\
+\hline
+1 & 30\\
+\hline
+1 & 13\\
+\hline
+1 & 12\\
+\hline
+1 & 21\\
+\hline
+1 & 20\\
+\hline
+1 & 23\\
+\hline
+1 & 25\\
+\hline
+1 & 23\\
+\hline
+1 & 29\\
+\hline
+1 & 35\\
+\hline
+1 & 31\\
+\hline
+1 & 36\\
+\hline
+2 & 32\\
+\hline
+2 & 27\\
+\hline
+2 & 23\\
+\hline
+2 & 12\\
+\hline
+2 & 18\\
+\hline
+2 & 38\\
+\hline
+2 & 29\\
+\hline
+2 & 30\\
+\hline
+2 & 32\\
+\hline
+2 & 25\\
+\hline
+2 & 30\\
+\hline
+2 & 37\\
+\hline
+2 & 27\\
+\hline
+3 & 22\\
+\hline
+3 & 26\\
+\hline
+3 & 28\\
+\hline
+3 & 19\\
+\hline
+3 & 15\\
+\hline
+3 & 12\\
+\hline
+3 & 35\\
+\hline
+3 & 35\\
+\hline
+3 & 10\\
+\hline
+3 & 22\\
+\hline
+3 & 18\\
+\hline
+3 & 12\\
+\hline
+3 & 31\\
+\hline
+3 & 24\\
+\hline
+3 & 37\\
+\hline
+3 & 29\\
+\hline
+4 & 27\\
+\hline
+4 & 18\\
+\hline
+4 & 22\\
+\hline
+4 & 13\\
+\hline
+4 & 18\\
+\hline
+4 & 29\\
+\hline
+4 & 28\\
+\hline
+4 & 16\\
+\hline
+4 & 22\\
+\hline
+4 & 26\\
+\hline
+4 & 19\\
+\hline
+4 & 17\\
+\hline
+4 & 28\\
+\hline
+4 & 26\\
+\hline
+4 & 12\\
+\hline
+4 & 17\\
+\hline
+4 & 26\\
+\hline
+\end{tabular}
+\centering
+\begin{tabular}[t]{c|c}
+\hline
+group\_censored & censor\_time\\
+\hline
+1 & 40\\
+\hline
+2 & 40\\
+\hline
+2 & 40\\
+\hline
+2 & 40\\
+\hline
+2 & 40\\
+\hline
+2 & 40\\
+\hline
+2 & 40\\
+\hline
+2 & 40\\
+\hline
+3 & 10\\
+\hline
+3 & 24\\
+\hline
+3 & 40\\
+\hline
+3 & 40\\
+\hline
+4 & 20\\
+\hline
+4 & 29\\
+\hline
+4 & 10\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Official code provide by the Stan
+team}\label{official-code-provide-by-the-stan-team}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{mice1 =}\StringTok{ "}
+\StringTok{data \{}
+\StringTok{  int<lower=0> N_uncensored;}
+\StringTok{  int<lower=0> N_censored;}
+\StringTok{  int<lower=0> M;}
+\StringTok{  int<lower=1,upper=M> group_uncensored[N_uncensored];}
+\StringTok{  int<lower=1,upper=M> group_censored[N_censored];}
+\StringTok{  real<lower=0> censor_time[N_censored];}
+\StringTok{  real<lower=0> t_uncensored[N_uncensored];}
+\StringTok{\}}
+
+\StringTok{parameters \{}
+\StringTok{  real<lower=0> r;}
+\StringTok{  real beta[M];}
+\StringTok{  real<lower=1> t2_censored[N_censored]; // t_censored / censor_time }
+\StringTok{\}}
+
+\StringTok{model \{}
+\StringTok{  r ~ exponential(0.001);}
+\StringTok{  beta ~ normal(0, 100);}
+\StringTok{  for (n in 1:N_uncensored) \{}
+\StringTok{    t_uncensored[n] ~ weibull(r, exp(-beta[group_uncensored[n]] / r));}
+\StringTok{  \}}
+\StringTok{  for (n in 1:N_censored) \{}
+\StringTok{    t2_censored[n] ~ weibull(r, exp(-beta[group_censored[n]] / r) / censor_time[n]);}
+\StringTok{  \}}
+\StringTok{\}}
+
+\StringTok{generated quantities \{}
+\StringTok{  real median[M];}
+\StringTok{  real pos_control;}
+\StringTok{  real test_sub;}
+\StringTok{  real veh_control;}
+\StringTok{  }
+\StringTok{  for (m in 1:M)}
+\StringTok{    median[m] <- pow(log(2) * exp(-beta[m]), 1/r);}
+\StringTok{  }
+\StringTok{  veh_control <- beta[2] - beta[1];}
+\StringTok{  test_sub    <- beta[3] - beta[1];}
+\StringTok{  pos_control <- beta[4] - beta[1];}
+\StringTok{\}}
+\StringTok{"} 
+
+\NormalTok{miceHMM1 <-}\StringTok{ }\KeywordTok{stan}\NormalTok{(}\DataTypeTok{model_code=}\NormalTok{mice1, }\DataTypeTok{data=}\NormalTok{dataList, }\DataTypeTok{seed =} \DecValTok{47306}\NormalTok{, }\DataTypeTok{chains=}\DecValTok{1}\NormalTok{,  }
+                    \DataTypeTok{iter=}\DecValTok{1000}\NormalTok{, }
+                    \DataTypeTok{warmup=}\DecValTok{500}\NormalTok{ ) }\CommentTok{# init=initsChains}
+\end{Highlighting}
+\end{Shaded}
+
+Notice that there are estimates for parameters
+\texttt{t2\_censored{[}1{]}} to \texttt{t2\_censored{[}15{]}} since this
+official Stan code is treating the censored data as parameters. The
+number of parameters for these censored values equals the number of
+censored values.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{knitr}\OperatorTok{::}\KeywordTok{kable}\NormalTok{(}\KeywordTok{summary}\NormalTok{(miceHMM1)}\OperatorTok{$}\NormalTok{summary, }
+             \DataTypeTok{digits =} \DecValTok{2}\NormalTok{,}
+             \DataTypeTok{caption =} \StringTok{'Summary statistics by the official Stan team'}\NormalTok{,}
+             \DataTypeTok{align =} \StringTok{'c'}\NormalTok{) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\NormalTok{kableExtra}\OperatorTok{::}\KeywordTok{kable_styling}\NormalTok{(}\DataTypeTok{bootstrap_options =} 
+                              \KeywordTok{c}\NormalTok{(}\StringTok{"striped"}\NormalTok{, }\StringTok{"hover"}\NormalTok{, }\StringTok{"condensed"}\NormalTok{)) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\NormalTok{kableExtra}\OperatorTok{::}\KeywordTok{scroll_box}\NormalTok{(}\DataTypeTok{width =} \StringTok{"800px"}\NormalTok{, }\DataTypeTok{height =} \StringTok{"700px"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{table}
+
+\caption{\label{tab:result1}Summary statistics by the official Stan team}
+\centering
+\begin{tabular}[t]{l|c|c|c|c|c|c|c|c|c|c}
+\hline
+  & mean & se\_mean & sd & 2.5\% & 25\% & 50\% & 75\% & 97.5\% & n\_eff & Rhat\\
+\hline
+r & 3.28 & 0.03 & 0.33 & 2.71 & 3.03 & 3.27 & 3.50 & 3.97 & 105.46 & 1.01\\
+\hline
+beta[1] & -10.86 & 0.11 & 1.15 & -13.21 & -11.60 & -10.84 & -10.04 & -8.81 & 108.22 & 1.01\\
+\hline
+beta[2] & -12.03 & 0.12 & 1.22 & -14.52 & -12.84 & -12.03 & -11.13 & -9.90 & 106.02 & 1.01\\
+\hline
+beta[3] & -11.20 & 0.12 & 1.18 & -13.64 & -11.95 & -11.18 & -10.29 & -9.22 & 101.12 & 1.01\\
+\hline
+beta[4] & -10.47 & 0.10 & 1.08 & -12.62 & -11.13 & -10.47 & -9.70 & -8.49 & 107.78 & 1.01\\
+\hline
+t2\_censored[1] & 1.07 & 0.00 & 0.07 & 1.00 & 1.02 & 1.05 & 1.10 & 1.25 & 355.27 & 1.00\\
+\hline
+t2\_censored[2] & 1.19 & 0.01 & 0.16 & 1.01 & 1.07 & 1.15 & 1.27 & 1.62 & 500.00 & 1.01\\
+\hline
+t2\_censored[3] & 1.20 & 0.01 & 0.17 & 1.00 & 1.06 & 1.16 & 1.29 & 1.61 & 389.84 & 1.00\\
+\hline
+t2\_censored[4] & 1.22 & 0.01 & 0.18 & 1.01 & 1.08 & 1.17 & 1.31 & 1.64 & 500.00 & 1.00\\
+\hline
+t2\_censored[5] & 1.20 & 0.01 & 0.18 & 1.01 & 1.07 & 1.15 & 1.28 & 1.70 & 500.00 & 1.00\\
+\hline
+t2\_censored[6] & 1.19 & 0.01 & 0.15 & 1.01 & 1.07 & 1.17 & 1.27 & 1.59 & 409.00 & 1.00\\
+\hline
+t2\_censored[7] & 1.20 & 0.01 & 0.18 & 1.01 & 1.07 & 1.15 & 1.28 & 1.71 & 500.00 & 1.00\\
+\hline
+t2\_censored[8] & 1.20 & 0.01 & 0.18 & 1.01 & 1.06 & 1.14 & 1.29 & 1.64 & 500.00 & 1.00\\
+\hline
+t2\_censored[9] & 2.80 & 0.05 & 0.90 & 1.27 & 2.14 & 2.79 & 3.38 & 4.77 & 315.86 & 1.00\\
+\hline
+t2\_censored[10] & 1.34 & 0.02 & 0.27 & 1.01 & 1.12 & 1.29 & 1.51 & 1.96 & 227.04 & 1.02\\
+\hline
+t2\_censored[11] & 1.11 & 0.00 & 0.10 & 1.00 & 1.03 & 1.08 & 1.16 & 1.36 & 413.91 & 1.00\\
+\hline
+t2\_censored[12] & 1.10 & 0.00 & 0.10 & 1.00 & 1.03 & 1.08 & 1.15 & 1.38 & 408.35 & 1.00\\
+\hline
+t2\_censored[13] & 1.35 & 0.01 & 0.26 & 1.01 & 1.14 & 1.31 & 1.50 & 1.96 & 500.00 & 1.01\\
+\hline
+t2\_censored[14] & 1.13 & 0.01 & 0.12 & 1.01 & 1.04 & 1.10 & 1.17 & 1.44 & 500.00 & 1.00\\
+\hline
+t2\_censored[15] & 2.34 & 0.03 & 0.67 & 1.26 & 1.83 & 2.27 & 2.80 & 3.61 & 379.86 & 1.00\\
+\hline
+median[1] & 24.49 & 0.10 & 1.89 & 21.05 & 23.18 & 24.54 & 25.75 & 28.25 & 352.91 & 1.00\\
+\hline
+median[2] & 34.99 & 0.13 & 2.92 & 29.81 & 33.04 & 34.83 & 36.96 & 41.06 & 500.00 & 1.00\\
+\hline
+median[3] & 27.15 & 0.11 & 2.18 & 23.03 & 25.72 & 27.04 & 28.54 & 31.86 & 415.10 & 1.01\\
+\hline
+median[4] & 21.74 & 0.08 & 1.69 & 18.91 & 20.58 & 21.58 & 22.78 & 25.19 & 478.79 & 1.00\\
+\hline
+pos\_control & 0.39 & 0.02 & 0.34 & -0.28 & 0.16 & 0.40 & 0.62 & 1.08 & 500.00 & 1.00\\
+\hline
+test\_sub & -0.34 & 0.02 & 0.34 & -1.02 & -0.57 & -0.32 & -0.09 & 0.29 & 393.64 & 1.00\\
+\hline
+veh\_control & -1.16 & 0.02 & 0.38 & -1.94 & -1.41 & -1.18 & -0.93 & -0.42 & 500.00 & 1.00\\
+\hline
+lp\_\_ & -266.45 & 0.29 & 3.54 & -273.89 & -268.86 & -266.23 & -263.87 & -260.54 & 147.76 & 1.02\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Code by Miao}\label{code-by-miao}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{miao =}\StringTok{ "}
+\StringTok{data \{}
+\StringTok{  int<lower=0> N_uncensored;}
+\StringTok{  int<lower=0> N_censored;}
+\StringTok{  int<lower=0> M;}
+\StringTok{  int<lower=1,upper=M> group_uncensored[N_uncensored];}
+\StringTok{  int<lower=1,upper=M> group_censored[N_censored];}
+\StringTok{  real<lower=0> censor_time[N_censored];}
+\StringTok{  real<lower=0> t_uncensored[N_uncensored];}
+\StringTok{\}}
+
+\StringTok{parameters\{}
+\StringTok{  real<lower=0> r;}
+\StringTok{  vector[M] beta;}
+\StringTok{\}}
+
+\StringTok{model\{}
+\StringTok{  for (i in 1:N_uncensored)\{}
+\StringTok{    t_uncensored[i] ~ weibull(r, exp(-beta[group_uncensored[i]] / r));}
+\StringTok{  \}}
+\StringTok{  for (j in 1:N_censored)\{}
+\StringTok{    target += weibull_lccdf(censor_time[j]|r, exp(-beta[group_censored[j]] / r));}
+\StringTok{  \}}
+\StringTok{  }
+\StringTok{  r ~ gamma(1, 1);}
+\StringTok{  beta ~ normal(0, 100);}
+\StringTok{  }
+\StringTok{\}}
+
+\StringTok{generated quantities \{}
+\StringTok{  real median[M];}
+\StringTok{  real pos_control;}
+\StringTok{  real test_sub;}
+\StringTok{  real veh_control;}
+\StringTok{  }
+\StringTok{  for (m in 1:M)}
+\StringTok{    median[m] <- pow(log(2) * exp(-beta[m]), 1/r);}
+\StringTok{  }
+\StringTok{  veh_control <- beta[2] - beta[1];}
+\StringTok{  test_sub    <- beta[3] - beta[1];}
+\StringTok{  pos_control <- beta[4] - beta[1];}
+\StringTok{\}}
+\StringTok{"}
+
+
+\NormalTok{miceHMM2 <-}\StringTok{ }\KeywordTok{stan}\NormalTok{(}\DataTypeTok{model_code=}\NormalTok{miao, }\DataTypeTok{data=}\NormalTok{dataList, }\DataTypeTok{seed =} \DecValTok{47306}\NormalTok{, }\DataTypeTok{chains=}\DecValTok{1}\NormalTok{,  }
+                    \DataTypeTok{iter=}\DecValTok{1000}\NormalTok{, }
+                    \DataTypeTok{warmup=}\DecValTok{500}\NormalTok{ ) }\CommentTok{# init=initsChains}
+\end{Highlighting}
+\end{Shaded}
+
+Notice in the Stan results here, there are not posterior distribution
+estimates for \texttt{t2\_censored{[}1{]}} to
+\texttt{t2\_censored{[}15{]}}. This is because we are integrating out
+these censored data, instead of treating them as parameters.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{knitr}\OperatorTok{::}\KeywordTok{kable}\NormalTok{(}\KeywordTok{summary}\NormalTok{(miceHMM2)}\OperatorTok{$}\NormalTok{summary,}
+             \DataTypeTok{digits =} \DecValTok{2}\NormalTok{,}
+             \DataTypeTok{caption =} \StringTok{'Summary statistics by Miao'}\NormalTok{,}
+             \DataTypeTok{align =} \StringTok{'c'}\NormalTok{) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\NormalTok{kableExtra}\OperatorTok{::}\KeywordTok{kable_styling}\NormalTok{(}\DataTypeTok{bootstrap_options =} 
+                              \KeywordTok{c}\NormalTok{(}\StringTok{"striped"}\NormalTok{, }\StringTok{"hover"}\NormalTok{, }\StringTok{"condensed"}\NormalTok{)) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\NormalTok{kableExtra}\OperatorTok{::}\KeywordTok{scroll_box}\NormalTok{(}\DataTypeTok{width =} \StringTok{"800px"}\NormalTok{) }
+\end{Highlighting}
+\end{Shaded}
+
+\begin{table}
+
+\caption{\label{tab:result2}Summary statistics by Miao}
+\centering
+\begin{tabular}[t]{l|c|c|c|c|c|c|c|c|c|c}
+\hline
+  & mean & se\_mean & sd & 2.5\% & 25\% & 50\% & 75\% & 97.5\% & n\_eff & Rhat\\
+\hline
+r & 3.19 & 0.03 & 0.30 & 2.62 & 2.97 & 3.20 & 3.38 & 3.75 & 102.55 & 1.01\\
+\hline
+beta[1] & -10.54 & 0.10 & 1.03 & -12.54 & -11.23 & -10.59 & -9.79 & -8.53 & 104.10 & 1.01\\
+\hline
+beta[2] & -11.69 & 0.11 & 1.11 & -13.74 & -12.42 & -11.79 & -10.85 & -9.70 & 104.83 & 1.02\\
+\hline
+beta[3] & -10.88 & 0.10 & 1.04 & -12.88 & -11.61 & -10.89 & -10.16 & -8.87 & 102.87 & 1.02\\
+\hline
+beta[4] & -10.16 & 0.10 & 0.99 & -12.07 & -10.83 & -10.19 & -9.44 & -8.26 & 103.89 & 1.01\\
+\hline
+median[1] & 24.30 & 0.08 & 1.75 & 21.10 & 23.18 & 24.18 & 25.42 & 27.83 & 500.00 & 1.00\\
+\hline
+median[2] & 35.02 & 0.15 & 3.32 & 29.21 & 33.00 & 34.73 & 36.86 & 41.96 & 500.00 & 1.00\\
+\hline
+median[3] & 27.08 & 0.10 & 2.32 & 22.61 & 25.58 & 27.00 & 28.40 & 32.17 & 500.00 & 1.01\\
+\hline
+median[4] & 21.58 & 0.07 & 1.66 & 18.38 & 20.43 & 21.51 & 22.70 & 25.28 & 500.00 & 1.00\\
+\hline
+pos\_control & 0.38 & 0.01 & 0.32 & -0.26 & 0.17 & 0.39 & 0.59 & 1.01 & 500.00 & 1.00\\
+\hline
+test\_sub & -0.34 & 0.01 & 0.33 & -1.02 & -0.56 & -0.34 & -0.12 & 0.30 & 500.00 & 1.00\\
+\hline
+veh\_control & -1.15 & 0.02 & 0.38 & -1.96 & -1.41 & -1.14 & -0.92 & -0.40 & 500.00 & 1.00\\
+\hline
+lp\_\_ & -249.29 & 0.12 & 1.55 & -253.18 & -250.20 & -248.95 & -248.09 & -247.20 & 177.41 & 1.01\\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{miao1 =}\StringTok{ "}
+\StringTok{data \{}
+\StringTok{  int<lower=0> N_uncensored;}
+\StringTok{  int<lower=0> N_censored;}
+\StringTok{  int<lower=0> M;}
+\StringTok{  int<lower=1,upper=M> group_uncensored[N_uncensored];}
+\StringTok{  int<lower=1,upper=M> group_censored[N_censored];}
+\StringTok{  real<lower=0> censor_time[N_censored];}
+\StringTok{  real<lower=0> t_uncensored[N_uncensored];}
+\StringTok{\}}
+
+\StringTok{parameters\{}
+\StringTok{  real<lower=0> r;}
+\StringTok{  vector[M] beta;}
+\StringTok{\}}
+
+\StringTok{model\{}
+\StringTok{  for (i in 1:N_uncensored)\{}
+\StringTok{    target += weibull_lpdf(t_uncensored[i]|r, exp(-beta[group_uncensored[i]] / r));}
+\StringTok{  \}}
+\StringTok{  for (j in 1:N_censored)\{}
+\StringTok{    target += weibull_lccdf(censor_time[j]|r, exp(-beta[group_censored[j]] / r));}
+\StringTok{  \}}
+\StringTok{  }
+\StringTok{  r ~ gamma(1, 1);}
+\StringTok{  beta ~ normal(0, 100);}
+\StringTok{  }
+\StringTok{\}}
+
+\StringTok{generated quantities \{}
+\StringTok{  real median[M];}
+\StringTok{  real pos_control;}
+\StringTok{  real test_sub;}
+\StringTok{  real veh_control;}
+\StringTok{  }
+\StringTok{  for (m in 1:M)}
+\StringTok{    median[m] <- pow(log(2) * exp(-beta[m]), 1/r);}
+\StringTok{  }
+\StringTok{  veh_control <- beta[2] - beta[1];}
+\StringTok{  test_sub    <- beta[3] - beta[1];}
+\StringTok{  pos_control <- beta[4] - beta[1];}
+\StringTok{\}}
+\StringTok{"}
+
+
+\NormalTok{miceHMM3 <-}\StringTok{ }\KeywordTok{stan}\NormalTok{(}\DataTypeTok{model_code=}\NormalTok{miao1, }\DataTypeTok{data=}\NormalTok{dataList, }\DataTypeTok{seed =} \DecValTok{47306}\NormalTok{, }\DataTypeTok{chains=}\DecValTok{1}\NormalTok{,  }
+                    \DataTypeTok{iter=}\DecValTok{1000}\NormalTok{, }
+                    \DataTypeTok{warmup=}\DecValTok{500}\NormalTok{ ) }\CommentTok{# init=initsChains}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## DIAGNOSTIC(S) FROM PARSER:
+## Info (non-fatal): assignment operator <- deprecated in the Stan language; use = instead.
+## Info (non-fatal): assignment operator <- deprecated in the Stan language; use = instead.
+## Info (non-fatal): assignment operator <- deprecated in the Stan language; use = instead.
+## Info (non-fatal): assignment operator <- deprecated in the Stan language; use = instead.
+## 
+## 
+## SAMPLING FOR MODEL '4ea33632a2097f06055f5062949b03d9' NOW (CHAIN 1).
+## Chain 1: 
+## Chain 1: Gradient evaluation took 0 seconds
+## Chain 1: 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
+## Chain 1: Adjust your expectations accordingly!
+## Chain 1: 
+## Chain 1: 
+## Chain 1: Iteration:   1 / 1000 [  0%]  (Warmup)
+## Chain 1: Iteration: 100 / 1000 [ 10%]  (Warmup)
+## Chain 1: Iteration: 200 / 1000 [ 20%]  (Warmup)
+## Chain 1: Iteration: 300 / 1000 [ 30%]  (Warmup)
+## Chain 1: Iteration: 400 / 1000 [ 40%]  (Warmup)
+## Chain 1: Iteration: 500 / 1000 [ 50%]  (Warmup)
+## Chain 1: Iteration: 501 / 1000 [ 50%]  (Sampling)
+## Chain 1: Iteration: 600 / 1000 [ 60%]  (Sampling)
+## Chain 1: Iteration: 700 / 1000 [ 70%]  (Sampling)
+## Chain 1: Iteration: 800 / 1000 [ 80%]  (Sampling)
+## Chain 1: Iteration: 900 / 1000 [ 90%]  (Sampling)
+## Chain 1: Iteration: 1000 / 1000 [100%]  (Sampling)
+## Chain 1: 
+## Chain 1:  Elapsed Time: 0.553 seconds (Warm-up)
+## Chain 1:                0.264 seconds (Sampling)
+## Chain 1:                0.817 seconds (Total)
+## Chain 1:
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{knitr}\OperatorTok{::}\KeywordTok{kable}\NormalTok{(}\KeywordTok{summary}\NormalTok{(miceHMM3)}\OperatorTok{$}\NormalTok{summary,}
+             \DataTypeTok{digits =} \DecValTok{2}\NormalTok{,}
+             \DataTypeTok{caption =} \StringTok{'Summary statistics by Miao'}\NormalTok{,}
+             \DataTypeTok{align =} \StringTok{'c'}\NormalTok{) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\NormalTok{kableExtra}\OperatorTok{::}\KeywordTok{kable_styling}\NormalTok{(}\DataTypeTok{bootstrap_options =} 
+                              \KeywordTok{c}\NormalTok{(}\StringTok{"striped"}\NormalTok{, }\StringTok{"hover"}\NormalTok{, }\StringTok{"condensed"}\NormalTok{)) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\NormalTok{kableExtra}\OperatorTok{::}\KeywordTok{scroll_box}\NormalTok{(}\DataTypeTok{width =} \StringTok{"800px"}\NormalTok{) }
+\end{Highlighting}
+\end{Shaded}
+
+\begin{table}
+
+\caption{\label{tab:result3}Summary statistics by Miao}
+\centering
+\begin{tabular}[t]{l|c|c|c|c|c|c|c|c|c|c}
+\hline
+  & mean & se\_mean & sd & 2.5\% & 25\% & 50\% & 75\% & 97.5\% & n\_eff & Rhat\\
+\hline
+r & 3.19 & 0.03 & 0.30 & 2.62 & 2.97 & 3.20 & 3.38 & 3.75 & 102.55 & 1.01\\
+\hline
+beta[1] & -10.54 & 0.10 & 1.03 & -12.54 & -11.23 & -10.59 & -9.79 & -8.53 & 104.10 & 1.01\\
+\hline
+beta[2] & -11.69 & 0.11 & 1.11 & -13.74 & -12.42 & -11.79 & -10.85 & -9.70 & 104.83 & 1.02\\
+\hline
+beta[3] & -10.88 & 0.10 & 1.04 & -12.88 & -11.61 & -10.89 & -10.16 & -8.87 & 102.87 & 1.02\\
+\hline
+beta[4] & -10.16 & 0.10 & 0.99 & -12.07 & -10.83 & -10.19 & -9.44 & -8.26 & 103.89 & 1.01\\
+\hline
+median[1] & 24.30 & 0.08 & 1.75 & 21.10 & 23.18 & 24.18 & 25.42 & 27.83 & 500.00 & 1.00\\
+\hline
+median[2] & 35.02 & 0.15 & 3.32 & 29.21 & 33.00 & 34.73 & 36.86 & 41.96 & 500.00 & 1.00\\
+\hline
+median[3] & 27.08 & 0.10 & 2.32 & 22.61 & 25.58 & 27.00 & 28.40 & 32.17 & 500.00 & 1.01\\
+\hline
+median[4] & 21.58 & 0.07 & 1.66 & 18.38 & 20.43 & 21.51 & 22.70 & 25.28 & 500.00 & 1.00\\
+\hline
+pos\_control & 0.38 & 0.01 & 0.32 & -0.26 & 0.17 & 0.39 & 0.59 & 1.01 & 500.00 & 1.00\\
+\hline
+test\_sub & -0.34 & 0.01 & 0.33 & -1.02 & -0.56 & -0.34 & -0.12 & 0.30 & 500.00 & 1.00\\
+\hline
+veh\_control & -1.15 & 0.02 & 0.38 & -1.96 & -1.41 & -1.14 & -0.92 & -0.40 & 500.00 & 1.00\\
+\hline
+lp\_\_ & -249.29 & 0.12 & 1.55 & -253.18 & -250.20 & -248.95 & -248.09 & -247.20 & 177.41 & 1.01\\
+\hline
+\end{tabular}
+\end{table}
+
+
+\end{document}

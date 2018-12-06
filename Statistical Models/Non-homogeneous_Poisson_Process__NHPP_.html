@@ -337,7 +337,9 @@ n &amp; = 0, 1, 2, \cdots, \quad  0 &lt; t_1 &lt; t_2 &lt; \cdots &lt; t_n
 <h3><span class="header-section-number">3.3.3</span> Log likelihood function</h3>
 <p>The log likelihood function <span class="math inline">\(l\)</span> is then:</p>
 <span class="math display">\[\begin{align}
-l &amp; = \Big(\sum_{i=1}^n\log\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big) - (\frac{\tau}{\theta})^\beta
+l &amp; = \log \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big)e^{-(\tau/\theta)^\beta}\\
+&amp; = \sum_{i=1}^n\log\Big(\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big) - (\frac{\tau}{\theta})^\beta\\
+&amp; = n\log\beta - n\beta\log\theta + (\beta - 1)\sum_{i=1}^n\log t_i - (\frac{\tau}{\theta})^\beta
 \end{align}\]</span>
 </div>
 </div>

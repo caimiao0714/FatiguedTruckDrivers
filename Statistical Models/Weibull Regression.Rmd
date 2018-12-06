@@ -84,8 +84,7 @@ The log of total probability of $N$ censored points is:
 Stan provides `<distribution>_lccdf` as the log of complementary CDF for built-in distributions, so `weibull_lccdf` is the log of complementary CDF of weibull distribution. The Equation \@ref(ltotalpdf) can be expressed as the following function in Stan:
 
 \begin{align*}
-\log \prod_{i = 1}^N P(t_i > C_i) & = \sum_{i = 1}^N \texttt{weibull_lccdf}(C_i|\kappa, \theta)\\
-
+\log \prod_{i = 1}^N P(t_i > C_i) & = \sum_{i = 1}^N \texttt{weibull_lccdf}(C_i|\kappa, \theta)
 \end{align*}
 
 When it is translated into Stan `model` block, it becomes:
@@ -106,7 +105,7 @@ This is the Mice example of Weibull regression, originally provided in [WinBUGS 
 ## Data
 
 ```{r data}
-rm(list=ls(all=TRUE))
+#rm(list=ls(all=TRUE))
 require(rstan)
 require(shinystan)
 
@@ -156,7 +155,7 @@ knitr::kable(list(data.frame(group_uncensored, t_uncensored),
                          "censored MICE survival data")) %>%
   kableExtra::kable_styling(bootstrap_options = "striped", 
                             full_width = F, position = "left") %>% 
-  kableExtra::scroll_box(width = "100%", height = "300px")
+  kableExtra::scroll_box(width = "110%", height = "300px")
 ```
 
 
@@ -206,21 +205,21 @@ generated quantities {
 }
 " 
 
-miceHMM1 <- stan(model_code=mice1, data=dataList, seed = 47306, chains=4,  
-                    iter=5000, 
-                    warmup=2000 ) # init=initsChains
+miceHMM1 <- stan(model_code=mice1, data=dataList, seed = 47306, chains=1,  
+                    iter=1000, 
+                    warmup=500 ) # init=initsChains
 ```
 
 Notice that there are estimates for parameters `t2_censored[1]` to `t2_censored[15]` since this official Stan code is treating the censored data as parameters. The number of parameters for these censored values equals the number of censored values.
 
 ```{r result1}
-knitr::kable(summary(miceHMM1), 
+knitr::kable(summary(miceHMM1)$summary, 
              digits = 2,
              caption = 'Summary statistics by the official Stan team',
              align = 'c') %>% 
   kableExtra::kable_styling(bootstrap_options = 
                               c("striped", "hover", "condensed")) %>% 
-  kableExtra::scroll_box(width = "700px", height = "700px")
+  kableExtra::scroll_box(width = "800px", height = "700px")
 ```
 
 
@@ -272,20 +271,87 @@ generated quantities {
 "
 
 
-miceHMM <- stan(model_code=miao, data=dataList, seed = 47306, chains=4,  
-                    iter=5000, 
-                    warmup=2000 ) # init=initsChains
+miceHMM2 <- stan(model_code=miao, data=dataList, seed = 47306, chains=1,  
+                    iter=1000, 
+                    warmup=500 ) # init=initsChains
 ```
 
 Notice in the Stan results here, there are not posterior distribution estimates for `t2_censored[1]` to `t2_censored[15]`. This is because we are integrating out these censored data, instead of treating them as parameters.
 
 ```{r result2}
-knitr::kable(summary(miceHMM),
+knitr::kable(summary(miceHMM2)$summary,
              digits = 2,
              caption = 'Summary statistics by Miao',
              align = 'c') %>% 
   kableExtra::kable_styling(bootstrap_options = 
                               c("striped", "hover", "condensed")) %>% 
-  kableExtra::scroll_box(width = "700px") 
+  kableExtra::scroll_box(width = "800px") 
+```
+
+
+
+
+
+
+```{r miao1, results='hide'}
+miao1 = "
+data {
+  int<lower=0> N_uncensored;
+  int<lower=0> N_censored;
+  int<lower=0> M;
+  int<lower=1,upper=M> group_uncensored[N_uncensored];
+  int<lower=1,upper=M> group_censored[N_censored];
+  real<lower=0> censor_time[N_censored];
+  real<lower=0> t_uncensored[N_uncensored];
+}
+
+parameters{
+  real<lower=0> r;
+  vector[M] beta;
+}
+
+model{
+  for (i in 1:N_uncensored){
+    target += weibull_lpdf(t_uncensored[i]|r, exp(-beta[group_uncensored[i]] / r));
+  }
+  for (j in 1:N_censored){
+    target += weibull_lccdf(censor_time[j]|r, exp(-beta[group_censored[j]] / r));
+  }
+  
+  r ~ gamma(1, 1);
+  beta ~ normal(0, 100);
+  
+}
+
+generated quantities {
+  real median[M];
+  real pos_control;
+  real test_sub;
+  real veh_control;
+  
+  for (m in 1:M)
+    median[m] <- pow(log(2) * exp(-beta[m]), 1/r);
+  
+  veh_control <- beta[2] - beta[1];
+  test_sub    <- beta[3] - beta[1];
+  pos_control <- beta[4] - beta[1];
+}
+"
+
+
+miceHMM3 <- stan(model_code=miao1, data=dataList, seed = 47306, chains=1,  
+                    iter=1000, 
+                    warmup=500 ) # init=initsChains
+```
+
+
+```{r result3}
+knitr::kable(summary(miceHMM3)$summary,
+             digits = 2,
+             caption = 'Summary statistics by Miao',
+             align = 'c') %>% 
+  kableExtra::kable_styling(bootstrap_options = 
+                              c("striped", "hover", "condensed")) %>% 
+  kableExtra::scroll_box(width = "800px") 
 ```
 
