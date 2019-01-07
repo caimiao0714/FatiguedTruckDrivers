@@ -24,35 +24,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r brmsCensoredPoisson}
 library(brms)
 require(dplyr)
-
-load("w2wdriver.Rdata")
-
-cpoisDAT = w2wdriver %>% 
-  select(driver_num, cnum, drivetime_cum, Age, BUSINESS_UNIT, YEARS_OF_EXP, visibility, precipIntensity, precipProbability) %>% 
-  filter(!is.na(Age)) %>% 
-  mutate(censoring = ifelse(cnum > 5, 1, 0),
-         cnum = ifelse(cnum >5, 5, cnum))
-
-
-cpoisFIT <- brm(
-  bf(cnum|cens(censoring) ~ drivetime_cum + BUSINESS_UNIT + YEARS_OF_EXP + visibility + precipIntensity + precipProbability + (1 + drivetime_cum|driver_num)),
-  data = cpoisDAT, family = poisson, 
-  iter = 5000, warmup = 2000, seed = 123,
-  prior = set_prior("normal(0,5)"),
-  chains = 1, cores = 1)
-
-saveRDS(cpoisFIT, "cpoisFIT.Rds")
-summary(cpoisFIT)
-shinystan::launch_shinystan(cpoisFIT)
-
-fixef(cpoisFIT)
-```
-
-# Weibull regression with `brms`
-
-```{r brmsWeibullwithin}
-library(brms)
-require(dplyr)
 require(tidyr)
 require(lubridate)
 
@@ -75,13 +46,14 @@ weibulltripDat = w2wdriver %>%
                        as.numeric(difftime(time_of_CE, begDate, units = "hours"))),
          censoring = ifelse(is.na(time_of_CE), 1, 0)) %>% 
   select(t2CT, censoring, driver_num, cnum, drivetime_cum, Age, BUSINESS_UNIT, YEARS_OF_EXP, visibility, precipIntensity, precipProbability) %>% 
-  filter(t2CT > 0)
+  filter(t2CT > 0) %>% 
+  na.omit()
 
 
 weibulltripFIT <- brm(
-  bf(t2CT|cens(censoring) ~ BUSINESS_UNIT + YEARS_OF_EXP + visibility + precipIntensity + precipProbability + (1 + drivetime_cum|driver_num)),
+  bf(t2CT|cens(censoring) ~ drivetime_cum + Age + YEARS_OF_EXP + visibility + precipIntensity + precipProbability + BUSINESS_UNIT + (1 + drivetime_cum|driver_num)),
   data = weibulltripDat, family = weibull(), 
-  iter = 4000, warmup = 2000, seed = 123,
+  iter = 2000, warmup = 1000, seed = 123,
   prior = set_prior("normal(0,5)"),
   chains = 1, cores = 4)
 
