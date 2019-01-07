@@ -319,9 +319,9 @@ The log of total probability of <span class="math inline">\(N\)</span> censored 
 \log \prod_{i = 1}^N P(t_i &gt; C_i) = \sum_{i = 1}^N\log\Big(1 - \Lambda(C_i|\kappa, \theta)\Big)
 \end{equation}\]</span>
 <p>Stan provides <code>&lt;distribution&gt;_lccdf</code> as the log of complementary CDF for built-in distributions, so <code>weibull_lccdf</code> is the log of complementary CDF of weibull distribution. The Equation @ref(ltotalpdf) can be expressed as the following function in Stan:</p>
-<span class="math display">\[\begin{align*}
-\log \prod_{i = 1}^N P(t_i &gt; C_i) &amp; = \sum_{i = 1}^N \texttt{weibull_lccdf}(C_i|\kappa, \theta)
-\end{align*}\]</span>
+<span class="math display">\[\begin{equation*}
+    \log \prod_{i = 1}^N P(t_i &gt; C_i) = \sum_{i = 1}^N \texttt{weibull\_lccdf}(C_i|\kappa, \theta)
+\end{equation*}\]</span>
 <p>When it is translated into Stan <code>model</code> block, it becomes:</p>
 <pre><code>for (i in 1:N){
   target += weibull_lccdf(censored_time[i] | kappa, theta)

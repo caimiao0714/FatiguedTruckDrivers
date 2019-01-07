@@ -5,12 +5,14 @@ author: "Miao Cai^[Department of Epidemiology and Biostatistics, Saint Louis Uni
 date: "`r Sys.Date()`"
 output:
   html_document:
+    code_folding: hide
+    fig_caption: true
+    css: hideOutput.css
     theme: readable
     toc: true
     toc_float: true
     number_sections: true
     df_print: paged
-    code_folding: hide
     highlight: tango
   pdf_document:
     number_sections: yes
@@ -19,12 +21,15 @@ linkcolor: blue
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(eval = F)
+knitr::opts_chunk$set(eval = T, cache = T,out.extra = 'class="plot"')
 ```
 
-# Poisson distribution
+<script src="hideOutput.js"></script>
 
-# Censored Poisson regression
+
+
+
+# Poisson Regression
 
 Logistic regression ignores the intensity of the critical events with any number greater than 0 categorized into 1. So we adopt a Bayesian hierarchical Poisson regression to model the effect of cumulative driving time on the occurrence of critical events. Each driver has a random intercept and a random slope on cumulative driving time.
 \begin{align}
@@ -36,71 +41,229 @@ Logistic regression ignores the intensity of the critical events with any number
 \end{align}
 Where N is the number of critical events for driver $d(i)$ in time interval $j$, and it has a Poisson distribution with parameter $\lambda$. The other variables are identical as those described in Equation \ref{logis}.
 
-# Stan codes
+# Censored Poisson Regression
 
-```{r BayesianPois}
-load("t.Rdata")
+In real data, some trips have over 40 critical events and these values cannot be true, so we assume these data points are censored at 5, which means any trips with more than 5 critical events are not observed, but we do know that these unobserved values are more than 5.
 
+For those trips with less than 5 critical events, we still assume the number of critical events has a Poisson distribution. However, we assume the number of critical events of trips with over 5 critical events are right censored at 5. We can integrate out these censored values by:
+
+\begin{align*}
+Pr(Y > 5) & = 1 - Pr(Y \leq 5)\\
+& = 1 - \sum_{i=0}^5\Lambda(t\cdot\lambda)
+\end{align*}
+Where $\Lambda$ is the Poisson cumulative distribution function.
+
+The log joint density function is then:
+
+\begin{align*}
+\log\prod_{i=1}^nPr(Y_i > 5) & = \log\Big(1 - \sum_{i=0}^5\Lambda(t\cdot\lambda)\Big)^n\\
+& = n\log\Big(1 - \sum_{i=0}^5\Lambda(t\cdot\lambda)\Big)
+\end{align*}
+
+This can be straightforwardly evaluated in `Stan` using the `poisson_lccdf` function.
+
+
+# Simulation
+
+\begin{align*}
+Y & \sim \text{POIS}(\text{TripTime}*e^\mu)\\
+\mu &= \beta_0 + \beta_1*CT + \beta_2*AGE
+\end{align*}
+
+In this simulation, we assume that the following parameters: $\beta_0 = -0.1$, $\beta_1 = 0.01$, $\beta_2 = 0.01$.
+
+Simulated data are draw by the following rules:
+
+- TripTime $\sim N(2, 0.3)$
+- Age: randomly drawn from 40 to 70
+- CT: $\sim GAMMA(10, 1)$
+
+We simulated 20 data sets bases on these rules at the sample size of 100, 500, 1000, 2000 and 3000. These simulations are based on certain random seeds to make them replicable.
+
+Here is a histogram of simulated $Y$s:
+
+```{r plotLambda, message = F, warning = F}
+library(tidyverse)
+set.seed(123)
+
+travelTime = rnorm(500, 2, 0.3)
+CT = rgamma(500, 10, 1)
+Age = sample(40:70, 500, replace = T)
+
+rate = travelTime*exp(-0.1 + 0.01*CT + 0.01*Age)
+Y = rpois(500, rate)
+simData = data.frame(Y, travelTime, CT, Age)
+
+simData %>% 
+  ggplot(aes(x = Y)) +
+  geom_histogram(binwidth = 1) +
+  theme_bw() + coord_cartesian(xlim = c(0, 10)) +
+  geom_vline(xintercept = 5, color = "red")
+```
+
+The data are assumed to be censored at 5, and the number of critical events will be set at 5 if the orginal number exceeds 5.
+
+```{r plotCensoredLambda, message = F, warning = F}
+simData %>%
+  mutate(Y = ifelse(Y > 5, 5, Y)) %>% 
+  ggplot(aes(x = Y)) +
+  geom_histogram(binwidth = 1) +
+  theme_bw() + coord_cartesian(xlim = c(0, 10))
+```
+
+
+```{r overviewSimDATA}
+simData %>%
+  mutate(Y = ifelse(Y > 5, 5, Y)) %>% 
+  slice(1:10) %>% 
+  knitr::kable(caption = "A sample of simulated data",
+               align = "c",
+               digits = 2)
+```
+
+
+<div class="fold s">
+```{r simData, eval = F}
 library(rstan)
 library(rstanarm)
 library(shinystan)
+rstan_options(auto_write = TRUE)
 options(mc.cores=parallel::detectCores())
 
-t1 = t[1:20000,]
-
-poistan = '
+cenPois = '
 data {
-  int<lower=0> n; //total # of obs
-  int<lower=0> k;
-
-  int<lower=0> driver_num[n]; //driver id
-  int<lower=0> cnum[n]; //count outcome
-  real<lower=0> drivetime_cum[n]; //cumulative time of driving
-  real<lower=0> travelTime[n];
-  int<lower=0> precip_bi[n]; //precipitation
+  int<lower=0>  N0;        //total # of NONcensored obs
+  int<lower=0>  N1;        //total # of censored obs
+  int<lower=0,upper=100> Y0[N0];  //# of critical events
+  int<lower=0,upper=100> Y1[N1];  //# of critical events
+  
+  vector<lower=0,upper=50>[N0] T0   ;   //travel time
+  vector<lower=0,upper=50>[N1] T1   ;   //travel time
+  vector<lower=0,upper=50>[N0] CT0   ;
+  vector<lower=0,upper=50>[N1] CT1   ;
+  vector<lower=0,upper=100>[N0] AGE0   ;
+  vector<lower=0,upper=100>[N1] AGE1   ;
 }
 parameters{
-  real beta0[k];
-  real beta1[k];
-  real beta2;
-  real mu0;
-  real mu1;
-  real<lower=0> sigma0;
-  real<lower=0> sigma1;
+  real b0;
+  real b1;
+  real b2;
 }
 model{
-  for(i in 1:n){
-    cnum[i] ~ poisson( travelTime[i] * exp(beta0[driver_num[i]] + beta1[driver_num[i]]*drivetime_cum[i] + beta2*precip_bi[i]) );
+  for (i in 1:N0){
+      Y0[i] ~ poisson_log( b0 + b1*CT0[i] + b2*AGE0[i] + log(T0[i]) );
   }
+  for (j in 1:N1){
+      target += poisson_lccdf( Y1[j] | T1[j]*exp(b0 + b1*CT1[j] + b2*AGE1[j]) );
+  }
+  
   //PRIORS
-  beta2 ~ normal(0, 10);
-  for(j in 1:k){
-  beta0[j] ~ normal(mu0, sigma0);
-  beta1[j] ~ normal(mu1, sigma1);
-  }
-  //HYPERPRIORS
-  mu0 ~ normal(0, 10);
-  mu1 ~ normal(0, 10);
-  sigma0 ~ gamma(1, 1);
-  sigma1 ~ gamma(1, 1);
+  b0 ~ normal(0, 10);
+  b1 ~ normal(0, 10);
+  b2 ~ normal(0, 10);
 }
 '
 
-datstan = list(n = nrow(t1),
-               k = max(t1$driver_num),
-               travelTime = t1$travelTime,
-               driver_num = t1$driver_num,
-               cnum = t1$cnum,
-               drivetime_cum = t1$drivetime_cum,
-               precip_bi = t1$precip_bi)
+# simulation
 
-hfitpois20000 <- stan(model_code=poistan, model_name="Poisstan", data=datstan, iter=5000,warmup = 1000, chains=3, control = list(adapt_delta = 0.95))
+resultDAT = data.frame(
+  samplesize = c(rep(100, 20), 
+                 rep(500, 20),
+                 rep(1000, 20),
+                 rep(2000, 20),
+                 rep(3000, 20)),
+  b0 = rep(NA, 100),
+  b1 = rep(NA, 100),
+  b2 = rep(NA, 100)
+)
 
-save(hfitpois20000, file = "hfitpois20000.Rdata")
+simCenPoi = function(obs, seed){
+  set.seed(seed)
+  nobs = obs
+  travelTime = rnorm(nobs, 2, 0.3)
+  drivetime_cum = rgamma(nobs, 10, 1)
+  Age = sample(40:70, nobs, replace = T)
 
-launch_shinystan(hfitpois20000)
+  lambda = travelTime*exp(-0.1 + 0.01*Age + 0.01*drivetime_cum)
+  cnum = rpois(nobs, lambda)
+  dat = data.frame(lambda, cnum, travelTime, drivetime_cum, Age)
+  
+  poiNC = dat[dat$cnum <5,]
+  poiC = dat[dat$cnum >=5,]
+  poiC$cnum = 5
+
+datstan = list(N0 = length(poiNC$travelTime),
+               T0 = poiNC$travelTime,
+               Y0 = poiNC$cnum,
+               N1 = length(poiC$travelTime),
+               T1 = poiC$travelTime,
+               Y1 = poiC$cnum,
+               CT1 = poiC$drivetime_cum,
+               CT0 = poiNC$drivetime_cum,
+               AGE1 = poiC$Age,
+               AGE0 = poiNC$Age)
+  
+  poiSIM <- stan(model_code=cPois, model_name="PoissonCensored", data=datstan, iter=2000,warmup = 1000, chains=1, seed = 123)
+  
+  return(summary(poiSIM)$summary[1][1:3])
+}
+
+for (i in 1:100) {
+ resultDAT[i,] = simCenPoi(resultDAT$samplesize[i], i)
+}
+
+#shinystan::launch_shinystan(poi1000)
+```
+</div>
+
+
+# Visualization of posterior estimates 
+
+## b0
+
+The true value of parameter $\beta_2$ is -0.1.
+
+```{r visb0,fig.align='c'}
+load("POISobsDAT.Rdata")
+POISobsDAT %>% ggplot(aes(x = factor(samplesize), y = b0)) +
+  geom_boxplot() + geom_hline(yintercept = -0.1, color = "red") + 
+  geom_jitter(width = 0.1, alpha = 0.5) + 
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=4) + 
+  xlab("Sample size")+ylab('Posteror mean of b0')+
+  ggtitle("Boxplots of estimated intercept in different simulated sample sizes") +
+  theme_bw()
 ```
 
+## b1
+
+The true value of parameter $\beta_1$ is 0.01.
+
+```{r visb1,fig.align='c'}
+POISobsDAT %>% ggplot(aes(x = factor(samplesize), y = b1)) +
+  geom_boxplot() + geom_hline(yintercept = 0.01, color = "red")+ 
+  geom_jitter(width = 0.1, alpha = 0.5) + 
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=4)+
+  xlab("Sample size")+ylab('Posteror mean of b1')+
+  ggtitle("Boxplots of estimated b0 in different simulated sample sizes")+
+  theme_bw()
+```
+
+## b2
+
+The true value of parameter $\beta_2$ is 0.01.
+
+```{r visb2,fig.align='c'}
+POISobsDAT %>% ggplot(aes(x = factor(samplesize), y = b2)) +
+  geom_boxplot() + geom_hline(yintercept = 0.01, color = "red")+ 
+  geom_jitter(width = 0.1, alpha = 0.5) + 
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=4)+
+  xlab("Sample size")+ylab('Posteror mean of b2')+
+  ggtitle("Boxplots of estimated b1 in different simulated sample sizes")+
+  theme_bw()
+```
 
 
 

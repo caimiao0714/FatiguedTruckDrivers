@@ -1,0 +1,101 @@
+---
+title: "Weibull and censored Poisson regression with brms"
+author: "Miao Cai"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: no
+    number_sections: yes
+  html_document:
+    cold_folding: yes
+    df_print: paged
+    number_sections: yes
+    theme: readable
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Censored Poisson regression with `brms`
+
+```{r brmsCensoredPoisson}
+library(brms)
+require(dplyr)
+
+load("w2wdriver.Rdata")
+
+cpoisDAT = w2wdriver %>% 
+  select(driver_num, cnum, drivetime_cum, Age, BUSINESS_UNIT, YEARS_OF_EXP, visibility, precipIntensity, precipProbability) %>% 
+  filter(!is.na(Age)) %>% 
+  mutate(censoring = ifelse(cnum > 5, 1, 0),
+         cnum = ifelse(cnum >5, 5, cnum))
+
+
+cpoisFIT <- brm(
+  bf(cnum|cens(censoring) ~ drivetime_cum + BUSINESS_UNIT + YEARS_OF_EXP + visibility + precipIntensity + precipProbability + (1 + drivetime_cum|driver_num)),
+  data = cpoisDAT, family = poisson, 
+  iter = 5000, warmup = 2000, seed = 123,
+  prior = set_prior("normal(0,5)"),
+  chains = 1, cores = 1)
+
+saveRDS(cpoisFIT, "cpoisFIT.Rds")
+summary(cpoisFIT)
+shinystan::launch_shinystan(cpoisFIT)
+
+fixef(cpoisFIT)
+```
+
+# Weibull regression with `brms`
+
+```{r brmsWeibullwithin}
+library(brms)
+require(dplyr)
+require(tidyr)
+require(lubridate)
+
+load("w2wdriver.Rdata")
+
+w2wdriver %>% 
+  select(driver_num, cnum, drivetime_cum, Age, BUSINESS_UNIT, YEARS_OF_EXP, visibility, precipIntensity, precipProbability) %>% 
+  filter(!is.na(Age))
+
+names(w2wdriver)
+
+CE_tripmax = max(w2wdriver$cnum)
+
+CE_DATIME = w2wdriver %>% 
+  separate(DATIME, sep = ";", into = paste0("CE_datime", 1:CE_tripmax)) %>%  
+  select(DATIME, driver_num, cnum, drivetime_cum, Age, BUSINESS_UNIT, YEARS_OF_EXP, visibility, precipIntensity, precipProbability) %>% 
+
+CE_LAT = w2wdriver %>% 
+  mutate(trip_id = 1:nrow(.)) %>% 
+  select(trip_id, LAT) %>% 
+  separate(LAT, sep = ";", into = paste0("CE_lat", 1:CE_tripmax)) %>%  
+  gather(key = Lat_NO, value = CE_lat, -trip_id, na.rm = T) %>% 
+  arrange(trip_id, Lat_NO) 
+
+CE_LON = w2wdriver %>% 
+  mutate(trip_id = 1:nrow(.)) %>% 
+  select(trip_id, LON) %>% 
+  separate(LON, sep = ";", into = paste0("CE_lon", 1:CE_tripmax)) %>%  
+  gather(key = Lon_NO, value = CE_lon, -trip_id, na.rm = T) %>% 
+  arrange(trip_id, Lon_NO) 
+
+CE_2weather = bind_cols(CE_DATIME, CE_LAT, CE_LON) %>% 
+  select(-c(trip_id1, trip_id2))
+
+
+
+
+
+
+WeibullDAT = w2wdriver %>% 
+  select(driver_num, cnum, drivetime_cum, Age, BUSINESS_UNIT, YEARS_OF_EXP, visibility, precipIntensity, precipProbability) %>% 
+  filter(!is.na(Age)) %>% 
+  mutate(censoring = ifelse(cnum > 0, 1, 0),
+         cnum = ifelse(cnum >5, 5, cnum))
+```
+

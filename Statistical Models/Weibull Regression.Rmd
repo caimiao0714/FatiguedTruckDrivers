@@ -4,6 +4,8 @@ subtitle: JQT paper with 200 drivers - Model 3
 author: "Miao Cai^[Department of Epidemiology and Biostatistics, Saint Louis University. Email address [miao.cai@slu.edu](miao.cai@slu.edu)]"
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    number_sections: yes
   html_document:
     theme: readable
     toc: true
@@ -12,8 +14,6 @@ output:
     df_print: paged
     code_folding: hide
     highlight: tango
-  pdf_document:
-    number_sections: yes
 link-citations: yes
 linkcolor: blue
 ---
@@ -83,9 +83,10 @@ The log of total probability of $N$ censored points is:
 
 Stan provides `<distribution>_lccdf` as the log of complementary CDF for built-in distributions, so `weibull_lccdf` is the log of complementary CDF of weibull distribution. The Equation \@ref(ltotalpdf) can be expressed as the following function in Stan:
 
-\begin{align*}
-\log \prod_{i = 1}^N P(t_i > C_i) & = \sum_{i = 1}^N \texttt{weibull_lccdf}(C_i|\kappa, \theta)
-\end{align*}
+\begin{equation*}
+	\log \prod_{i = 1}^N P(t_i > C_i) = \sum_{i = 1}^N \texttt{weibull\_lccdf}(C_i|\kappa, \theta)
+\end{equation*}
+
 
 When it is translated into Stan `model` block, it becomes:
 
@@ -138,6 +139,62 @@ dataList = list(
   t_uncensored = t_uncensored
 )
 ```
+
+
+
+```{r miao1, results='hide'}
+miao1 = "
+data {
+  int<lower=0> N_uncensored;
+  int<lower=0> N_censored;
+  int<lower=0> M;
+  int<lower=1,upper=M> group_uncensored[N_uncensored];
+  int<lower=1,upper=M> group_censored[N_censored];
+  real<lower=0> censor_time[N_censored];
+  real<lower=0> t_uncensored[N_uncensored];
+}
+
+parameters{
+  real<lower=0> r;
+  vector[M] beta;
+}
+
+model{
+  for (i in 1:N_uncensored){
+    target += weibull_lpdf(t_uncensored[i]|r, exp(beta[group_uncensored[i]]) );
+  }
+  for (j in 1:N_censored){
+    target += weibull_lccdf(censor_time[j]|r, exp(beta[group_censored[j]]));
+  }
+  
+  r ~ gamma(1, 1);
+  beta ~ normal(0, 100);
+  
+}
+
+generated quantities {
+  real median[M];
+  real pos_control;
+  real test_sub;
+  real veh_control;
+  
+  for (m in 1:M)
+    median[m] = exp(beta[m])*pow(log(2), 1/r);
+  
+  veh_control = beta[2] - beta[1];
+  test_sub    = beta[3] - beta[1];
+  pos_control = beta[4] - beta[1];
+}
+"
+
+
+miceHMM3 <- stan(model_code=miao1, data=dataList, seed = 47306, chains=1,  
+                    iter=1000, 
+                    warmup=500 ) # init=initsChains
+
+unname(summary(miceHMM3)$summary[,1])
+```
+
 
 The survival time for four treatment groups were observed. We split the observed data into two parts:
 
