@@ -1,0 +1,245 @@
+---
+title: "JQT paper 200 drivers on OSC"
+author: "Miao Cai"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: no
+    number_sections: yes
+  html_document:
+    cold_folding: yes
+    df_print: paged
+    number_sections: yes
+    theme: readable
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r brmsCensoredPoisson}
+library(brms)
+require(dplyr)
+
+load("w2wdriver.Rdata")
+
+cpoisDAT = w2wdriver %>% 
+  select(driver_num, cnum, drivetime_cum, Age, BUSINESS_UNIT, YEARS_OF_EXP, visibility, precipIntensity, precipProbability) %>% 
+  filter(!is.na(Age)) %>% 
+  mutate(censoring = ifelse(cnum > 5, 1, 0),
+         cnum = ifelse(cnum >5, 5, cnum))
+
+
+cpoisFIT <- brm(
+  bf(cnum|cens(censoring) ~ drivetime_cum + Age  + YEARS_OF_EXP + visibility + precipIntensity + precipProbability + BUSINESS_UNIT + (1 + drivetime_cum|driver_num)),
+  data = cpoisDAT, family = poisson, 
+  iter = 5000, warmup = 2000, seed = 123,
+  prior = set_prior("normal(0,5)"),
+  chains = 4, cores = 4)
+
+saveRDS(cpoisFIT, "cpoisFIT.Rds")
+```
+
+
+```{r}
+cpoisFIT= readRDS("cpoisFIT.Rds")
+summary(cpoisFIT)
+
+broom::tidy(cpoisFIT)
+shinystan::launch_shinystan(cpoisFIT)
+
+fixef(cpoisFIT)
+```
+
+
+
+
+```{r brmsWeibullwithin}
+library(brms)
+require(dplyr)
+require(tidyr)
+require(lubridate)
+
+load("w2wdriver.Rdata")
+#names(w2wdriver)
+
+CE_tripmax = max(w2wdriver$cnum)
+
+weibulltripDat = w2wdriver %>% 
+  separate(DATIME, sep = ";", into = paste0("CE_datime", 1:CE_tripmax)) %>%  
+  mutate(begDate = ymd_hms(begDate, tz = "America/Chicago"), 
+         EndTime = ymd_hms(EndTime, tz = "America/Chicago"),
+         time_of_CE1 = ymd_hms(CE_datime1, tz = "America/Chicago"),
+         time_of_CE2 = mdy_hm(CE_datime1, tz = "America/Chicago"),
+         time_of_CE = coalesce(time_of_CE1, time_of_CE2),
+         t2CT = ifelse(is.na(time_of_CE), 
+                       travelTime,
+                       as.numeric(difftime(time_of_CE, begDate, units = "hours"))),
+         censoring = ifelse(is.na(time_of_CE), 1, 0)) %>% 
+  select(t2CT, censoring, driver_num, cnum, drivetime_cum, Age, BUSINESS_UNIT, YEARS_OF_EXP, visibility, precipIntensity, precipProbability) %>% 
+  filter(t2CT > 0) %>% 
+  na.omit()
+
+
+weibulltripFIT <- brm(
+  bf(t2CT|cens(censoring) ~ drivetime_cum + Age + YEARS_OF_EXP + visibility + precipIntensity + precipProbability + BUSINESS_UNIT + (1 + drivetime_cum|driver_num)),
+  data = weibulltripDat, family = weibull(), 
+  iter = 5000, warmup = 2000, seed = 123,
+  prior = set_prior("normal(0,5)"),
+  chains = 4, cores = 4)
+
+# should i exclude the cases where the critical events occurred right at the beginning the trip (t2CT = 0). This cannot be a Weibull distribution outcome!
+
+
+saveRDS(weibulltripFIT, "weibulltripFIT.Rds")
+summary(weibulltripFIT)
+fixef(weibulltripFIT)
+
+#shinystan::launch_shinystan(weibulltripFIT)
+```
+
+
+
+
+# Archived code to explore critical events in trips data
+
+```{r}
+require(dplyr)
+require(tidyr)
+require(lubridate)
+
+load("w2wdriver.Rdata")
+
+CE_tripmax = max(w2wdriver$cnum)
+
+CE_DATIME = w2wdriver %>% 
+  mutate(trip_id = 1:nrow(.)) %>% 
+  select(trip_id, DATIME) %>% 
+  separate(DATIME, sep = ";", into = paste0("CE_datime", 1:CE_tripmax)) %>%  
+  gather(key = Datime_NO, value = time_of_CE, -trip_id, na.rm = T) %>% 
+  arrange(trip_id, Datime_NO) %>% 
+  mutate(time_of_CE1 = ymd_hms(time_of_CE),
+         time_of_CE2 = mdy_hm(time_of_CE),
+         time_of_CE = coalesce(time_of_CE1, time_of_CE2),
+         time_of_CE = lubridate::force_tz(time_of_CE, "US/Central")) %>% 
+  select(-c(time_of_CE1, time_of_CE2))
+
+CE_LAT = w2wdriver %>% 
+  mutate(trip_id = 1:nrow(.)) %>% 
+  select(trip_id, LAT) %>% 
+  separate(LAT, sep = ";", into = paste0("CE_lat", 1:CE_tripmax)) %>%  
+  gather(key = Lat_NO, value = CE_lat, -trip_id, na.rm = T) %>% 
+  arrange(trip_id, Lat_NO) 
+
+CE_LON = w2wdriver %>% 
+  mutate(trip_id = 1:nrow(.)) %>% 
+  select(trip_id, LON) %>% 
+  separate(LON, sep = ";", into = paste0("CE_lon", 1:CE_tripmax)) %>%  
+  gather(key = Lon_NO, value = CE_lon, -trip_id, na.rm = T) %>% 
+  arrange(trip_id, Lon_NO) 
+
+CE_2weather = bind_cols(CE_DATIME, CE_LAT, CE_LON) %>% 
+  select(-c(trip_id1, trip_id2))
+```
+
+
+# Archived Stan code
+
+```{r BayesianPois, eval = FALSE}
+library(rstan)
+library(rstanarm)
+library(shinystan)
+options(mc.cores=parallel::detectCores())
+
+
+load("w2wdriver.Rdata")
+w2wdriver = w2wdriver[!is.na(w2wdriver$Age),]
+
+poistan = '
+data {
+  int<lower=0> n; //total # of obs
+  int<lower=0> k;
+
+  int<lower=0> driver_num[n]; //driver id
+  int<lower=0> cnum[n]; //binary outcome
+  real<lower=0> drivetime_cum[n]; //cumulative time of driving
+  real<lower=0> travelTime[n];
+  int<lower=0> Age[n]; //precipitation
+  int<lower=0> JBI00[n];
+  int<lower=0> VAN00[n];
+  real<lower=0> visibility[n];
+  real<lower=0> precipIntensity[n];
+  real<lower=0> precipProbability[n];
+}
+parameters{
+  vector[k] beta0;
+  vector[k] beta1;
+  real b_age;
+  real b_JBI;
+  real b_VAN;
+  real b_visibility;
+  real b_prec_inten;
+  real b_prec_prob;
+  real mu0;
+  real mu1;
+  real<lower=0> sigma0;
+  real<lower=0> sigma1;
+}
+model{
+  vector[n] lambda;
+  for(i in 1:n){
+    lambda[i] = travelTime[i]*exp(mu0 + beta0[driver_num[i]]*sigma0 + (mu1 + beta1[driver_num[i]]*sigma1)*drivetime_cum[i] + b_age*Age[i] + b_JBI*JBI00[i] + b_VAN*VAN00[i] + b_visibility*visibility[i] + b_prec_inten*precipIntensity[i] + b_prec_prob*precipProbability[i]);
+    cnum[i] ~ poisson(lambda[i]) T[,5];
+  }
+  
+    //HYPERPRIORS
+  mu0 ~ normal(0, 10);
+  mu1 ~ normal(0, 10);
+  sigma0 ~ gamma(1, 1);
+  sigma1 ~ gamma(1, 1);
+  //PRIORS
+  b_age ~ normal(0, 10);
+  b_JBI ~ normal(0, 10);
+  b_VAN ~ normal(0, 10);
+  b_visibility ~ normal(0, 10);
+  b_prec_inten ~ normal(0, 10);
+  b_prec_prob ~ normal(0, 10);
+  beta0 ~ normal(0, 1);
+  beta1 ~ normal(0, 1);
+}
+'
+
+w1000 = w2wdriver[1:20000,]
+
+w1000$JBI00 = 0 # DCS00 as reference
+w1000$JBI00[w1000$BUSINESS_UNIT == "JBI00"] = 1
+w1000$VAN00 = 0
+w1000$VAN00[w1000$BUSINESS_UNIT == "VAN00"] = 1 # DCS00 as reference
+
+w1000$driver_num = as.integer(factor(w1000$driver_num)) # reorder driver number
+w1000$visibility[is.na(w1000$visibility)] = mean(w1000$visibility, na.rm = T)
+
+datstan = list(n = nrow(w1000),
+               k = max(w1000$driver_num),
+               driver_num = w1000$driver_num,
+               travelTime = w1000$travelTime,
+               cnum = w1000$cnum,
+               drivetime_cum = w1000$drivetime_cum,
+               Age = w1000$Age,
+               JBI00 = w1000$JBI00,
+               VAN00 = w1000$VAN00,
+               visibility = w1000$visibility,
+               precipIntensity = w1000$precipIntensity,
+               precipProbability = w1000$precipProbability)
+
+
+
+hfitpoisTrun5 <- stan(model_code=poistan, model_name="Poisstan", data=datstan, iter=5000,warmup = 2000, chains=4, control = list(adapt_delta = 0.8), init_r = 1, seed = 123)
+
+
+save(hfitpoisTrun5, file = "hfitpoisTrun5.Rdata")
+
+launch_shinystan(hfitpoisTrun5)
+```
