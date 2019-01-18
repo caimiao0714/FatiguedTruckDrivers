@@ -1,0 +1,383 @@
+---
+title: "JQT Paper with 500 drivers"
+author: "Miao Cai"
+date: "11/16/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data clearning
+
+```{r restoredata, eval = FALSE}
+require(dplyr)
+require(lubridate)
+require(data.table)
+
+
+pingTab = data.table::fread(
+  "Meeeting-11-16-18%2Fsample_pings_500drivers (1).csv")
+
+pingORIG = data.table::fread(
+  "Meeeting-11-16-18%2Fpings_500drivers_11.csv", 
+  nrows = Inf, col.names = names(pingTab)[1:10])
+
+TripORIG = data.table::fread("Meeeting-11-16-18%2Ftrips_crit_500drivers.csv")
+#critData = data.table::fread("Meeeting-11-16-18%2Ftrips_crit_500drivers.csv")
+# TripData & critData are identical
+
+# .Rds is the most efficient way of storing data compared to .Rdata, .csv and .feather
+saveRDS(pingORIG, "pingORIG.Rds")
+saveRDS(TripORIG, "TripORIG.Rds")
+```
+
+## Aggregate Ping data
+
+```{r weather}
+pingORIG = readRDS("pingORIG.Rds")
+TripORIG = readRDS("TripORIG.Rds")
+
+require(dplyr)
+
+
+trimnum= function(x, decimal) trunc(x*10^decimal)/10^decimal
+
+pingData = filter(pingORIG, id != "\"N" ) %>%
+  tibble::as_tibble() %>% 
+  mutate(DATIME = lubridate::ymd_hms(DATIME),
+         LATITUDE = trimnum(LATITUDE, 2), 
+         LONGITUDE = trimnum(LONGITUDE, 2)) %>% 
+  select(DATIME, LATITUDE, LONGITUDE, id, LATITUDEHMS)
+
+saveRDS(pingData, "pingData.Rds")
+
+
+timeHOUR = pingData %>% 
+  mutate(DATIME = lubridate::ymd_h(substr(DATIME, 1, 13))) %>% 
+  count(LATITUDE, LONGITUDE, DATIME, sort = TRUE)
+
+saveRDS(timeHOUR, "timeHOUR.Rds")
+#### Check time zone ####
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Manipulating trips data
+
+```{r tripsdata}
+TripORIG = readRDS("TripORIG.Rds")
+
+TripData = TripORIG %>% 
+  filter(!is.na(driver1)) %>% 
+  mutate(begDate = lubridate::ymd_hms(begDate),
+         EndTime = lubridate::ymd_hms(EndTime)) %>% 
+  arrange(driver1, begDate)
+
+
+# the function to segment trips
+segment_1 = function(threshold_hour, time_diff){
+  r1 = time_diff >= threshold_hour
+  r2 = rle(r1)
+  r2$values[r2$values == FALSE] = 0
+  r2$values = cumsum(r2$values)
+  return(inverse.rle(r2))
+}
+
+
+vEndTime = TripData$EndTime 
+
+# cumulative driving time
+t = TripData %>% group_by(driver1) %>% 
+  mutate(time_diff = difftime(begDate, lag(EndTime, default = 0), units = "hours"),
+         time_diff = ifelse(row_number() == 1, 0, time_diff),
+         shift = segment_1(8, time_diff),
+         driver_shift_id = paste(driver1, shift, sep = "_")) %>% 
+  ungroup() %>% 
+  select(-EndTime) %>% 
+  tibble::add_column(EndTime = vEndTime, .after = "begDate")
+
+t$waiting_time[t$waiting_time == "NULL"] = 0
+t$waiting_time = as.numeric(t$waiting_time)
+t$intervalTime = t$travelTime + t$waiting_time
+
+t$cumTravel <- ave(t$intervalTime, t$driver_shift_id, FUN=cumsum)
+t$cumDrive <- ave(t$travelTime, t$driver_shift_id, FUN=cumsum)
+
+t$cumTravel <- round(t$cumTravel/60, 2)
+t$cumDrive <- round(t$cumDrive/60, 2)
+
+t = t[t$cumDrive>0.1 & t$cumDrive<12,]
+
+saveRDS(t, "t.Rds")
+```
+
+```{r}
+require(ggplot2)
+
+dit = data.frame(
+  quant = seq(0, 1, 0.001),
+  cumDrive = quantile(t$cumDrive, seq(0, 1, 0.001))
+)
+
+
+dit %>% ggplot(aes(x = cumDrive, y = quant)) + geom_line() +
+  xlab("Cumulative driving time (CT)") + ylab("Quantiles") + 
+  ggtitle("Quantiles by CT")
+ggsave("Quantiles by CT.pdf", width = 10, height = 10/1.618)
+
+dit %>% 
+  mutate(diff = cumDrive - lag(cumDrive)) %>% 
+  ggplot(aes(x = cumDrive, y = diff)) + geom_line()+ 
+  xlab("Cumulative driving time (CT)") + ylab("Delta CT")+
+  ggtitle("Delta CT by 0.001 quantile")
+ggsave("Delta CT by 0.001 quantile.pdf", width = 10, height = 10/1.618)
+
+dit %>% 
+  mutate(diff = cumDrive - lag(cumDrive)) %>% 
+  ggplot(aes(x = cumDrive, y = diff)) + geom_line()+
+  scale_x_continuous(breaks = 0:15, limits = c(0, 15))+
+  scale_y_continuous(limits = c(0, 1)) + 
+  xlab("Cumulative driving time (CT)") + ylab("Delta CT")+
+  ggtitle("Delta CT by 0.001 quantile - A clip")
+ggsave("Delta CT by 0.001 quantile - A clip.pdf", width = 10, height = 10/1.618)
+```
+
+
+# Logistic regression
+## Logistic regresion - drive time as the predictor
+
+```{r }
+require(dplyr)
+require(rstanarm)
+
+t = readRDS("t.Rds")
+
+set.seed(123)
+
+t = t %>% 
+  mutate(driverID = as.numeric(as.factor(driver1)),
+         outlogit = ifelse(cnum>0, 1, 0),
+         travelTime = travelTime/60) %>% 
+  select(outlogit, driverID, cumTravel, cumDrive, begDate, travelTime, cnum, DATIME)
+
+traindat = t %>% group_by(driverID) %>% 
+  sample_frac(0.1) %>% 
+  ungroup() %>% 
+  select(outlogit, driverID, cumDrive, travelTime)
+
+logit500drive <- stan_glmer(
+  outlogit ~ cumDrive + travelTime + (1 + cumDrive | driverID),
+  data = traindat, QR = TRUE,
+  family = binomial(link = "logit"), init = 0,
+  cores = parallel::detectCores(), seed = 123,
+  chains = 3, iter = 5000, warmup = 2000)
+
+
+saveRDS(logit500drive, file = "logit500drive.rds")
+
+
+
+logit500drive = readRDS("logit500drive.rds")
+broom::tidy(logit500drive, digits = 4, intervals = TRUE)
+# summary(logit500drive)
+# logit500drive$coefficients
+# shinystan::launch_shinystan(fit_logit)
+```
+
+
+## Logistic regresion - travel time as the predictor
+
+```{r}
+# logit travel time
+require(dplyr)
+require(rstanarm)
+
+t = readRDS("t500.Rds")
+
+set.seed(123)
+
+t = t %>% 
+  mutate(driverID = as.numeric(as.factor(driver1)),
+         outlogit = ifelse(cnum>0, 1, 0),
+         travelTime = travelTime/60) %>% 
+  select(outlogit, driverID, cumTravel, cumDrive, travelTime, begDate, cnum, DATIME)
+
+traindat = t %>% group_by(driverID) %>% 
+  sample_frac(0.1) %>% 
+  ungroup() %>% 
+  select(outlogit, driverID, cumTravel, travelTime)
+
+logit500travel <- stan_glmer(
+  outlogit ~ cumTravel + travelTime + (1 + cumTravel | driverID),
+  data = traindat, QR = TRUE,
+  family = binomial(link = "logit"), init = 0,
+  cores = parallel::detectCores(), seed = 123,
+  chains = 3, iter = 5000, warmup = 2000)
+
+saveRDS(logit500travel, file = "logit500travel.rds")
+
+
+
+
+logit500travel = readRDS("logit500travel.rds")
+broom::tidy(logit500travel, digits = 4, intervals = TRUE)
+# shinystan::launch_shinystan(logit500travel)
+```
+
+
+
+## Censored Poisson regression
+
+Censored Poisson regression - cumulative driving time as the predictor
+
+```{r censoredPoissonDrive}
+library(brms)
+require(dplyr)
+
+t = readRDS("t.Rds")
+
+set.seed(123)
+
+traindat = t %>% 
+  mutate(driverID = as.numeric(as.factor(driver1)),
+         outpoisson = ifelse(cnum>5, 5, cnum),
+         censoring = ifelse(cnum > 5, 1, 0),
+         travelTime = travelTime/60) %>% 
+  group_by(driverID) %>% 
+  sample_frac(0.1) %>% 
+  ungroup() %>% 
+  select(outpoisson, censoring, driverID, cumDrive, travelTime)
+
+
+cpois500drive <- brm(
+  bf(outpoisson|cens(censoring) ~ cumDrive + offset(travelTime) + (1 + cumDrive|driverID)),
+  data = traindat, family = poisson, 
+  iter = 5000, warmup = 2000, seed = 123,
+  chains = 3, cores = parallel::detectCores())
+
+saveRDS(cpois500drive, "cpois500drive.Rds")
+```
+
+Censored Poisson regression - cumulative travelling time as the predictor
+
+```{r censoredPoissonTravel}
+library(brms)
+require(dplyr)
+
+t = readRDS("t.Rds")
+
+set.seed(123)
+
+traindat = t %>% 
+  mutate(driverID = as.numeric(as.factor(driver1)),
+         outpoisson = ifelse(cnum>5, 5, cnum),
+         censoring = ifelse(cnum > 5, 1, 0),
+         travelTime = travelTime/60) %>% 
+  group_by(driverID) %>% 
+  sample_frac(0.1) %>% 
+  ungroup() %>% 
+  select(outpoisson, censoring, driverID, cumTravel, travelTime)
+
+
+cpois500travel <- brm(
+  bf(outpoisson|cens(censoring) ~ cumTravel + offset(travelTime) + (1 + cumTravel|driverID)),
+  data = traindat, family = poisson, 
+  iter = 5000, warmup = 2000, seed = 123,
+  chains = 3, cores = parallel::detectCores())
+
+saveRDS(cpois500travel, "cpois500travel.Rds")
+```
+
+
+## Weibull regression
+
+```{r brmsWeibullwithin}
+library(brms)
+require(dplyr)
+require(tidyr)
+require(lubridate)
+
+t = readRDS("t.Rds")
+
+#names(w2wdriver)
+CE_tripmax = max(t$cnum)
+weibulltripDat = t %>% 
+  separate(DATIME, sep = ";", into = paste0("CE_datime", 1:CE_tripmax)) %>%  
+  mutate(driver_num = as.numeric(as.factor(driver1)),
+         time_of_CE1 = ymd_hms(CE_datime1, tz = "America/Chicago"),
+         time_of_CE2 = mdy_hm(CE_datime1, tz = "America/Chicago"),
+         time_of_CE = coalesce(time_of_CE1, time_of_CE2),
+         t2CT = ifelse(is.na(time_of_CE), 
+                       travelTime/60,
+                       as.numeric(difftime(time_of_CE, begDate, units = "hours"))),
+         censoring = ifelse(is.na(time_of_CE), 1, 0)) %>% 
+  select(t2CT, censoring, driver_num, cnum, cumDrive) %>% 
+  filter(t2CT > 0) %>% 
+  na.omit()
+
+weibull500drive <- brm(
+  bf(t2CT|cens(censoring) ~ cumDrive + (1 + cumDrive|driver_num)),
+  data = weibulltripDat, family = weibull(), 
+  iter = 5000, warmup = 2000, seed = 123,
+  prior = set_prior("normal(0,5)"),
+  chains = 3, cores = 3)
+# should i exclude the cases where the critical events occurred right at the beginning the trip (t2CT = 0). This cannot be a Weibull distribution outcome!
+saveRDS(weibull500drive, "weibull500drive.Rds")
+summary(weibull500drive)
+fixef(weibull500drive)
+#shinystan::launch_shinystan(weibull500drive)
+```
+
+
+
+
+# Archived code to explore critical events in trips data
+
+```{r}
+require(dplyr)
+require(tidyr)
+require(lubridate)
+load("w2wdriver.Rdata")
+CE_tripmax = max(w2wdriver$cnum)
+CE_DATIME = w2wdriver %>% 
+  mutate(trip_id = 1:nrow(.)) %>% 
+  select(trip_id, DATIME) %>% 
+  separate(DATIME, sep = ";", into = paste0("CE_datime", 1:CE_tripmax)) %>%  
+  gather(key = Datime_NO, value = time_of_CE, -trip_id, na.rm = T) %>% 
+  arrange(trip_id, Datime_NO) %>% 
+  mutate(time_of_CE1 = ymd_hms(time_of_CE),
+         time_of_CE2 = mdy_hm(time_of_CE),
+         time_of_CE = coalesce(time_of_CE1, time_of_CE2),
+         time_of_CE = lubridate::force_tz(time_of_CE, "US/Central")) %>% 
+  select(-c(time_of_CE1, time_of_CE2))
+CE_LAT = w2wdriver %>% 
+  mutate(trip_id = 1:nrow(.)) %>% 
+  select(trip_id, LAT) %>% 
+  separate(LAT, sep = ";", into = paste0("CE_lat", 1:CE_tripmax)) %>%  
+  gather(key = Lat_NO, value = CE_lat, -trip_id, na.rm = T) %>% 
+  arrange(trip_id, Lat_NO) 
+CE_LON = w2wdriver %>% 
+  mutate(trip_id = 1:nrow(.)) %>% 
+  select(trip_id, LON) %>% 
+  separate(LON, sep = ";", into = paste0("CE_lon", 1:CE_tripmax)) %>%  
+  gather(key = Lon_NO, value = CE_lon, -trip_id, na.rm = T) %>% 
+  arrange(trip_id, Lon_NO) 
+CE_2weather = bind_cols(CE_DATIME, CE_LAT, CE_LON) %>% 
+  select(-c(trip_id1, trip_id2))
+```
+
+
