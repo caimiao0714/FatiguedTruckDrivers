@@ -66,19 +66,11 @@ saveRDS(timeHOUR, "timeHOUR.Rds")
 
 
 
-
-
-
-
-
-
-
-
-
-
 ## Manipulating trips data
 
 ```{r tripsdata}
+require(dplyr)
+
 TripORIG = readRDS("TripORIG.Rds")
 
 TripData = TripORIG %>% 
@@ -122,8 +114,12 @@ t$cumDrive <- round(t$cumDrive/60, 2)
 
 t = t[t$cumDrive>0.1 & t$cumDrive<12,]
 
+t$driverID = as.numeric(as.factor(t$driver1))
+
 saveRDS(t, "t.Rds")
 ```
+
+plots
 
 ```{r}
 require(ggplot2)
@@ -160,7 +156,7 @@ ggsave("Delta CT by 0.001 quantile - A clip.pdf", width = 10, height = 10/1.618)
 # Logistic regression
 ## Logistic regresion - drive time as the predictor
 
-```{r }
+```{r archived}
 require(dplyr)
 require(rstanarm)
 
@@ -169,8 +165,7 @@ t = readRDS("t.Rds")
 set.seed(123)
 
 t = t %>% 
-  mutate(driverID = as.numeric(as.factor(driver1)),
-         outlogit = ifelse(cnum>0, 1, 0),
+  mutate(outlogit = ifelse(cnum>0, 1, 0),
          travelTime = travelTime/60) %>% 
   select(outlogit, driverID, cumTravel, cumDrive, begDate, travelTime, cnum, DATIME)
 
@@ -179,15 +174,27 @@ traindat = t %>% group_by(driverID) %>%
   ungroup() %>% 
   select(outlogit, driverID, cumDrive, travelTime)
 
+
+
 logit500drive <- stan_glmer(
   outlogit ~ cumDrive + travelTime + (1 + cumDrive | driverID),
   data = traindat, QR = TRUE,
   family = binomial(link = "logit"), init = 0,
   cores = parallel::detectCores(), seed = 123,
   chains = 3, iter = 5000, warmup = 2000)
-
-
 saveRDS(logit500drive, file = "logit500drive.rds")
+
+zz = traindat[traindat$driverID<=50,]
+
+logit500quad <- stan_glmer(
+  outlogit ~ cumDrive + travelTime + I(cumDrive^2) + (1 + cumDrive + I(cumDrive^2)| driverID),
+  data = zz, QR = TRUE,
+  family = binomial(link = "logit"), init_r = 0.1,
+  cores = parallel::detectCores(), seed = 123,
+  chains = 1, iter = 5000, warmup = 2000)
+
+saveRDS(logit500quad, file = "logit500quad.rds")
+
 
 
 
@@ -196,6 +203,79 @@ broom::tidy(logit500drive, digits = 4, intervals = TRUE)
 # summary(logit500drive)
 # logit500drive$coefficients
 # shinystan::launch_shinystan(fit_logit)
+```
+
+Compare 1-100 and 100-199
+
+```{r}
+#### 1-100
+require(dplyr)
+require(rstanarm)
+
+t = readRDS("t.Rds")
+
+set.seed(123)
+
+t1_100 = t %>% 
+  filter(driverID <= 100) %>% 
+  mutate(outlogit = ifelse(cnum>0, 1, 0),
+         travelTime = travelTime/60) %>% 
+  select(outlogit, driverID, cumDrive, travelTime)
+
+#traindat = t %>% group_by(driverID) %>% 
+  sample_frac(0.1) %>% 
+  ungroup() %>% 
+  select(outlogit, driverID, cumDrive, travelTime)
+
+logit1_100 <- stan_glmer(
+  outlogit ~ cumDrive + travelTime + (1 + cumDrive | driverID),
+  data = t1_100, QR = TRUE,
+  family = binomial(link = "logit"), init = 0,
+  cores = parallel::detectCores(), seed = 123,
+  chains = 3, iter = 5000, warmup = 2000)
+saveRDS(logit1_100, file = "logit1_100.rds")
+
+
+#### 100 - 199
+t100_199 = t %>% 
+  filter(driverID >= 100, driverID <= 199) %>% 
+  mutate(outlogit = ifelse(cnum>0, 1, 0),
+         travelTime = travelTime/60) %>% 
+  select(outlogit, driverID, cumDrive, travelTime)
+
+logit100_199 <- stan_glmer(
+  outlogit ~ cumDrive + travelTime + (1 + cumDrive | driverID),
+  data = t100_199, QR = TRUE,
+  family = binomial(link = "logit"), init = 0,
+  cores = parallel::detectCores(), seed = 123,
+  chains = 3, iter = 5000, warmup = 2000)
+saveRDS(logit100_199, file = "logit100_199.rds")
+
+```
+
+
+```{r}
+logit1_100 = readRDS("logit1_100.rds")
+logit100_199 = readRDS("logit100_199.rds")
+
+broom::tidy(logit1_100, "varying", interval = TRUE)[199:200,]
+broom::tidy(logit100_199, "varying", interval = TRUE)[1:2,]
+
+postplot = function(data, par){
+  bayesplot::mcmc_areas(
+  as.array(data), 
+  pars = par,
+  prob = 0.8, # 80% intervals
+  prob_outer = 0.99, # 99%
+  point_est = "mean")
+}
+
+postplot(logit100_199, "b[cumDrive driverID:100]")
+postplot(logit1_100, "b[cumDrive driverID:100]")
+
+postplot(logit100_199, "b[(Intercept) driverID:100]")
+postplot(logit1_100, "b[(Intercept) driverID:100]")
+
 ```
 
 
