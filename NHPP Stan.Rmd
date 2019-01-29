@@ -1,0 +1,134 @@
+---
+title: "Rigdon Basu (1989) Time truncated data example"
+author: "Miao Cai <miao.cai@slu.edu>"
+date: "1/29/2019"
+output:
+  html_document:
+    df_print: paged
+linkcolor: blue
+subtitle: replication in Stan
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+# Time truncated data - 115 kV Transmission line example
+
+This data is presented by Martz (1975). It gives the failure times, or interrpution times, of the 115 kV transmission circuit from Cunningham Generating Station, located near Hobbs, New Mexico, to Eddy County Interchange, located near Artesia, New Mexico. We assume that data collection was terminated on December 31, 1971.
+
+Data collected in this manner, with testing terminated at a predetermined time, are called time truncated. It is important to distinguish between these approches to data collection because statistical inference precedures are different for the two situations.
+
+```{r}
+library(rstan)
+
+t = c(0.129, 0.151, 0.762, 0.869, 2.937, 3.077, 3.841, 3.964, 4.802, 4.898, 7.868, 8.430)
+trunc_time = 8.463
+
+datstan = list(
+  n = length(t),
+  tau = trunc_time,
+  t = t)
+```
+
+MLE estimates of $\beta$ and $theta$ are:
+
+\[
+\hat{\beta} = \frac{12}{\sum_{i=1}^{12}\ln(8.463/t_i)} = 0.678\\
+\hat{\theta} = \frac{8.463}{12^{1/0.678}} = 0.217
+\]
+
+
+## Diffuse priors for beta and theta - GAMMMA(1, 1)
+
+The log likelihood function $l$ for time truncated non-homogeneous Poisson process is:
+
+\begin{align*}
+l & = \log \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big)e^{-(\tau/\theta)^\beta}\\
+& = \sum_{i=1}^n\log\Big(\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big) - (\frac{\tau}{\theta})^\beta\\
+& = n\log\beta - n\beta\log\theta + (\beta - 1)\sum_{i=1}^n\log t_i - (\frac{\tau}{\theta})^\beta
+\end{align*}
+
+```{r}
+plpstan = '
+functions{
+  real nhpp_log(vector t, real beta, real theta, real tau){
+    vector[num_elements(t)] loglik_part;
+    real loglikelihood;
+    for (i in 1:num_elements(t)){
+      loglik_part[i] = log(beta) - beta*log(theta) + (beta - 1)*log(t[i]);
+    }
+    loglikelihood = sum(loglik_part) - (tau/theta)^beta;
+    return loglikelihood;
+  }
+}
+data {
+  int<lower=0> n; //total # of obs
+  real<lower=0> tau;//truncated time
+  vector<lower=0>[n] t; //failure time
+}
+parameters{
+  real<lower=0> beta;
+  real<lower=0> theta;
+}
+model{
+  t ~ nhpp(beta, theta, tau);
+//PRIORS
+beta ~ gamma(1, 1);
+theta ~ gamma(1, 1);
+}
+'
+
+fitplp <- stan(
+  model_code=plpstan, model_name="NHPP", data=datstan, 
+  iter=5000,warmup = 2000, chains=1, seed = 123
+)
+
+fitplp
+```
+
+Compared to MLE estimate of $\hat{\beta} = 0.678, \hat{\theta} = 0.217$.
+
+## Weakly informative priors for beta and theta - GAMMMA(1, 5)
+
+```{r}
+plpstan15 = '
+functions{
+  real nhpp_log(vector t, real beta, real theta, real tau){
+    vector[num_elements(t)] loglik_part;
+    real loglikelihood;
+    for (i in 1:num_elements(t)){
+      loglik_part[i] = log(beta) - beta*log(theta) + (beta - 1)*log(t[i]);
+    }
+    loglikelihood = sum(loglik_part) - (tau/theta)^beta;
+    return loglikelihood;
+  }
+}
+data {
+  int<lower=0> n; //total # of obs
+  real<lower=0> tau;//truncated time
+  vector<lower=0>[n] t; //failure time
+}
+parameters{
+  real<lower=0> beta;
+  real<lower=0> theta;
+}
+model{
+  t ~ nhpp(beta, theta, tau);
+//PRIORS
+beta ~ gamma(1, 5);
+theta ~ gamma(1, 5);
+}
+'
+
+fitplp15 <- stan(
+  model_code=plpstan15, model_name="NHPP15", data=datstan, 
+  iter=5000,warmup = 2000, chains=1, seed = 123
+)
+
+
+fitplp15
+```
+
+Compared to MLE estimate of $\hat{\beta} = 0.678, \hat{\theta} = 0.217$.

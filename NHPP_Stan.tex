@@ -1,0 +1,214 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\PassOptionsToPackage{usenames,dvipsnames}{color} % color is loaded by hyperref
+\hypersetup{unicode=true,
+            pdftitle={Rigdon Basu (1989) Time truncated data example},
+            pdfauthor={Miao Cai miao.cai@slu.edu},
+            colorlinks=true,
+            linkcolor=blue,
+            citecolor=Blue,
+            urlcolor=Blue,
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{graphicx,grffile}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\IfFileExists{parskip.sty}{%
+\usepackage{parskip}
+}{% else
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{0}
+% Redefines (sub)paragraphs to behave more like sections
+\ifx\paragraph\undefined\else
+\let\oldparagraph\paragraph
+\renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+\let\oldsubparagraph\subparagraph
+\renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+
+%%% Use protect on footnotes to avoid problems with footnotes in titles
+\let\rmarkdownfootnote\footnote%
+\def\footnote{\protect\rmarkdownfootnote}
+
+%%% Change title format to be more compact
+\usepackage{titling}
+
+% Create subtitle command for use in maketitle
+\providecommand{\subtitle}[1]{
+  \posttitle{
+    \begin{center}\large#1\end{center}
+    }
+}
+
+\setlength{\droptitle}{-2em}
+
+  \title{Rigdon Basu (1989) Time truncated data example}
+    \pretitle{\vspace{\droptitle}\centering\huge}
+  \posttitle{\par}
+  \subtitle{replication in Stan}
+  \author{Miao Cai \href{mailto:miao.cai@slu.edu}{\nolinkurl{miao.cai@slu.edu}}}
+    \preauthor{\centering\large\emph}
+  \postauthor{\par}
+      \predate{\centering\large\emph}
+  \postdate{\par}
+    \date{1/29/2019}
+
+
+\begin{document}
+\maketitle
+
+\hypertarget{time-truncated-data---115-kv-transmission-line-example}{%
+\section{Time truncated data - 115 kV Transmission line
+example}\label{time-truncated-data---115-kv-transmission-line-example}}
+
+\hypertarget{this-data-is-presented-by-martz-1975}{%
+\section{This data is presented by Martz
+(1975)}\label{this-data-is-presented-by-martz-1975}}
+
+\hypertarget{it-gives-the-failure-times-or-interrpution-times-of-the-115-kv-transmission-circuit-from-cunningham-generating-station-located-near-hobbs-new-mexico-to-eddy-county-interchange-located-near-artesia-new-mexico.-we-assume-that-data-collection-was-terminated-on-december-31-1971.}{%
+\section{It gives the failure times, or interrpution times, of the 115
+kV transmission circuit from Cunningham Generating Station, located near
+Hobbs, New Mexico, to Eddy County Interchange, located near Artesia, New
+Mexico. We assume that data collection was terminated on December 31,
+1971.}\label{it-gives-the-failure-times-or-interrpution-times-of-the-115-kv-transmission-circuit-from-cunningham-generating-station-located-near-hobbs-new-mexico-to-eddy-county-interchange-located-near-artesia-new-mexico.-we-assume-that-data-collection-was-terminated-on-december-31-1971.}}
+
+\hypertarget{data-collected-in-this-manner-with-testing-terminated-at-a-predetermined-time-are-called-time-truncated.-it-is-important-to-distinguish-between-these-approches-to-data-collection-because-statistical-inference-precedures-are-different-for-the-two-situations.}{%
+\section{Data collected in this manner, with testing terminated at a
+predetermined time, are called time truncated. It is important to
+distinguish between these approches to data collection because
+statistical inference precedures are different for the two
+situations.}\label{data-collected-in-this-manner-with-testing-terminated-at-a-predetermined-time-are-called-time-truncated.-it-is-important-to-distinguish-between-these-approches-to-data-collection-because-statistical-inference-precedures-are-different-for-the-two-situations.}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{pacman}\OperatorTok{::}\KeywordTok{p_load}\NormalTok{(rstan, tidyverse)}
+
+
+\NormalTok{t =}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{0.129}\NormalTok{, }\FloatTok{0.151}\NormalTok{, }\FloatTok{0.762}\NormalTok{, }\FloatTok{0.869}\NormalTok{, }\FloatTok{2.937}\NormalTok{, }\FloatTok{3.077}\NormalTok{, }\FloatTok{3.841}\NormalTok{, }\FloatTok{3.964}\NormalTok{, }\FloatTok{4.802}\NormalTok{, }\FloatTok{4.898}\NormalTok{, }\FloatTok{7.868}\NormalTok{, }\FloatTok{8.430}\NormalTok{)}
+\NormalTok{y =}\StringTok{ }\KeywordTok{rep}\NormalTok{(}\FloatTok{0.5}\NormalTok{, }\KeywordTok{length}\NormalTok{(t))}
+\NormalTok{dat =}\StringTok{ }\KeywordTok{data.frame}\NormalTok{(t, y)}
+\NormalTok{trunc_time =}\StringTok{ }\FloatTok{8.463}
+
+\KeywordTok{ggplot}\NormalTok{(dat, }\KeywordTok{aes}\NormalTok{(}\DataTypeTok{x =}\NormalTok{ t, }\DataTypeTok{y =}\NormalTok{ y)) }\OperatorTok{+}\StringTok{ }\KeywordTok{geom_point}\NormalTok{() }\OperatorTok{+}\StringTok{ }\KeywordTok{geom_line}\NormalTok{()}
+
+\NormalTok{plpstan =}\StringTok{ '}
+\StringTok{functions\{}
+\StringTok{  real nhpp_log(vector t, real beta, real theta, real tau)\{}
+\StringTok{    vector[num_elements(t)] loglik_part;}
+\StringTok{    real loglikelihood;}
+\StringTok{    for (i in 1:num_elements(t))\{}
+\StringTok{      loglik_part[i] = log(beta) - beta*log(theta) + (beta - 1)*log(t[i]);}
+\StringTok{    \}}
+\StringTok{    loglikelihood = sum(loglik_part) - (tau/theta)^beta;}
+\StringTok{    return loglikelihood;}
+\StringTok{  \}}
+\StringTok{\}}
+\StringTok{data \{}
+\StringTok{  int<lower=0> n; //total # of obs}
+\StringTok{  real<lower=0> tau;//truncated time}
+\StringTok{  vector<lower=0>[n] t; //failure time}
+\StringTok{\}}
+\StringTok{parameters\{}
+\StringTok{  real<lower=0> beta;}
+\StringTok{  real<lower=0> theta;}
+\StringTok{\}}
+\StringTok{model\{}
+\StringTok{  t ~ nhpp(beta, theta, tau);}
+\StringTok{//PRIORS}
+\StringTok{beta ~ gamma(1, 1);}
+\StringTok{theta ~ gamma(1, 1);}
+\StringTok{\}}
+\StringTok{'}
+
+\NormalTok{datstan =}\StringTok{ }\KeywordTok{list}\NormalTok{(}\DataTypeTok{n =} \KeywordTok{length}\NormalTok{(t),}
+               \DataTypeTok{tau =}\NormalTok{ trunc_time,}
+               \DataTypeTok{t =}\NormalTok{ t)}
+
+\NormalTok{fitplp <-}\StringTok{ }\KeywordTok{stan}\NormalTok{(}
+  \DataTypeTok{model_code=}\NormalTok{plpstan, }\DataTypeTok{model_name=}\StringTok{"NHPP"}\NormalTok{, }\DataTypeTok{data=}\NormalTok{datstan, }
+  \DataTypeTok{iter=}\DecValTok{5000}\NormalTok{,}\DataTypeTok{warmup =} \DecValTok{2000}\NormalTok{, }\DataTypeTok{chains=}\DecValTok{1}
+\NormalTok{)}
+
+
+\NormalTok{broom}\OperatorTok{::}\KeywordTok{tidy}\NormalTok{(fitplp)}
+\end{Highlighting}
+\end{Shaded}
+
+
+\end{document}

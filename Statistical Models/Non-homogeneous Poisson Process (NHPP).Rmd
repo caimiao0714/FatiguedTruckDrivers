@@ -146,3 +146,9 @@ l & = \log \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1
 & = \sum_{i=1}^n\log\Big(\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big) - (\frac{\tau}{\theta})^\beta\\
 & = n\log\beta - n\beta\log\theta + (\beta - 1)\sum_{i=1}^n\log t_i - (\frac{\tau}{\theta})^\beta
 \end{align*}
+
+
+```{r}
+
+```
+
