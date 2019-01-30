@@ -3,20 +3,23 @@ title: "Rigdon Basu (1989) Time truncated data example"
 author: "Miao Cai <miao.cai@slu.edu>"
 date: "1/29/2019"
 output:
+  pdf_document:
+    number_sections: true
   html_document:
     df_print: paged
 linkcolor: blue
 subtitle: replication in Stan
 link-citations: yes
+bibliography: ref.bib
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, cache = TRUE)
 ```
 
 # Time truncated data - 115 kV Transmission line example
 
-This data is presented by Martz (1975). It gives the failure times, or interrpution times, of the 115 kV transmission circuit from Cunningham Generating Station, located near Hobbs, New Mexico, to Eddy County Interchange, located near Artesia, New Mexico. We assume that data collection was terminated on December 31, 1971.
+This data is presented by @martz1975pooling. It gives the failure times, or interrpution times, of the 115 kV transmission circuit from Cunningham Generating Station, located near Hobbs, New Mexico, to Eddy County Interchange, located near Artesia, New Mexico. We assume that data collection was terminated on December 31, 1971.
 
 Data collected in this manner, with testing terminated at a predetermined time, are called time truncated. It is important to distinguish between these approches to data collection because statistical inference precedures are different for the two situations.
 
@@ -32,12 +35,12 @@ datstan = list(
   t = t)
 ```
 
-MLE estimates of $\beta$ and $theta$ are:
+MLE estimates of $\beta$ and $theta$ are provided by @rigdon1989power:
 
 \[
-\hat{\beta} = \frac{12}{\sum_{i=1}^{12}\ln(8.463/t_i)} = 0.678\\
-\hat{\theta} = \frac{8.463}{12^{1/0.678}} = 0.217
+\hat{\beta} = \frac{12}{\sum_{i=1}^{12}\ln(8.463/t_i)} = 0.678
 \]
+$$\hat{\theta} = \frac{8.463}{12^{1/0.678}} = 0.217$$
 
 
 ## Diffuse priors for beta and theta - GAMMMA(1, 1)
@@ -51,7 +54,7 @@ l & = \log \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1
 \end{align*}
 
 ```{r}
-plpstan = '
+plpstan11 = '
 functions{
   real nhpp_log(vector t, real beta, real theta, real tau){
     vector[num_elements(t)] loglik_part;
@@ -75,13 +78,13 @@ parameters{
 model{
   t ~ nhpp(beta, theta, tau);
 //PRIORS
-beta ~ gamma(1, 1);
-theta ~ gamma(1, 1);
+  beta ~ gamma(1, 1);
+  theta ~ gamma(1, 1);
 }
 '
 
 fitplp <- stan(
-  model_code=plpstan, model_name="NHPP", data=datstan, 
+  model_code=plpstan11, model_name="NHPP", data=datstan, 
   iter=5000,warmup = 2000, chains=1, seed = 123
 )
 
@@ -132,3 +135,68 @@ fitplp15
 ```
 
 Compared to MLE estimate of $\hat{\beta} = 0.678, \hat{\theta} = 0.217$.
+
+## Another example
+
+This software failure times in seconds example was presented in @bar1992bayesian.
+
+```{r}
+library(rstan)
+
+software_failure = c(
+  115, 115, 198, 376, 570, 706, 1783, 1798, 1813, 1905, 1955, 2026, 2632, 
+  3821, 3861, 4649, 4871, 4943, 5558, 6147, 6162, 6552, 8415, 9752, 14260, 
+  15094, 18494, 18500, 23061, 26229, 36800, 37363, 40133, 40785, 46378, 
+  58074, 64798, 67344)
+software_fTrun = software_failure[length(software_failure)]
+
+datsoftware = list(
+  n = length(software_failure),
+  tau = software_fTrun,
+  t = software_failure)
+```
+
+
+```{r}
+plpsoftware <- stan(
+  model_code=plpstan11, model_name="NHPPfailureT", data=datsoftware, 
+  iter=5000,warmup = 2000, chains=1, seed = 123
+)
+
+plpsoftware
+```
+
+
+
+
+# Failure truncation data (INCORRECT)
+
+This failure truncation example is also from @rigdon1989power.
+
+MLE estimates for $\beta$ and $\theta$ are:
+
+$$\hat{\beta} = \frac{13}{\sum_{i=1}^{13-1}\ln(4596/t_i)} = 0.569$$
+$$\hat{\theta} = \frac{4596}{13^{1/0.596}} = 50.7$$
+
+```{r}
+library(rstan)
+
+t1 = c(55, 166, 205, 341, 488, 567, 731, 1308, 2050, 2453, 3115, 4017, 4596)
+trunc_timet1 = t1[length(t1)]
+
+datfailure = list(
+  n = length(t1),
+  tau = trunc_timet1,
+  t = t1)
+```
+
+```{r}
+plpfailure <- stan(
+  model_code=plpstan11, model_name="NHPPfailureT", data=datfailure, 
+  iter=5000,warmup = 2000, chains=1, seed = 123
+)
+
+plpfailure
+```
+
+# References

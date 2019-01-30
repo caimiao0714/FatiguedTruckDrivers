@@ -236,7 +236,7 @@ display: none;
 padding: 0 4px 0 4px;
 }
 .pagedtable .even {
-background-color: rgba(140, 140, 140, 0.1);
+background-color: #fcfcfc;
 }
 .pagedtable-padding-col {
 display: none;
@@ -1553,9 +1553,6 @@ img {
 button.code-folding-btn:focus {
   outline: none;
 }
-summary {
-  display: list-item;
-}
 </style>
 
 
@@ -1563,74 +1560,14 @@ summary {
 <div class="container-fluid main-container">
 
 <!-- tabsets -->
-
-<style type="text/css">
-.tabset-dropdown > .nav-tabs {
-  display: inline-table;
-  max-height: 500px;
-  min-height: 44px;
-  overflow-y: auto;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-.tabset-dropdown > .nav-tabs > li.active:before {
-  content: "";
-  font-family: 'Glyphicons Halflings';
-  display: inline-block;
-  padding: 10px;
-  border-right: 1px solid #ddd;
-}
-
-.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
-  content: "";
-  border: none;
-}
-
-.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
-  content: "";
-  font-family: 'Glyphicons Halflings';
-  display: inline-block;
-  padding: 10px;
-  border-right: 1px solid #ddd;
-}
-
-.tabset-dropdown > .nav-tabs > li.active {
-  display: block;
-}
-
-.tabset-dropdown > .nav-tabs > li > a,
-.tabset-dropdown > .nav-tabs > li > a:focus,
-.tabset-dropdown > .nav-tabs > li > a:hover {
-  border: none;
-  display: inline-block;
-  border-radius: 4px;
-}
-
-.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
-  display: block;
-  float: none;
-}
-
-.tabset-dropdown > .nav-tabs > li {
-  display: none;
-}
-</style>
-
 <script>
 $(document).ready(function () {
   window.buildTabsets("TOC");
 });
-
-$(document).ready(function () {
-  $('.tabset-dropdown > .nav-tabs > li').click(function () {
-    $(this).parent().toggleClass('nav-tabs-open')
-  });
-});
 </script>
 
 <!-- code folding -->
+
 
 
 
@@ -1674,7 +1611,7 @@ l &amp; = \log \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta
 &amp; = \sum_{i=1}^n\log\Big(\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1}\Big) - (\frac{\tau}{\theta})^\beta\\
 &amp; = n\log\beta - n\beta\log\theta + (\beta - 1)\sum_{i=1}^n\log t_i - (\frac{\tau}{\theta})^\beta
 \end{align*}\]</span></p>
-<pre class="r"><code>plpstan = '
+<pre class="r"><code>plpstan = &#39;
 functions{
   real nhpp_log(vector t, real beta, real theta, real tau){
     vector[num_elements(t)] loglik_part;
@@ -1701,11 +1638,11 @@ model{
 beta ~ gamma(1, 1);
 theta ~ gamma(1, 1);
 }
-'
+&#39;
 
 fitplp &lt;- stan(
   model_code=plpstan, model_name=&quot;NHPP&quot;, data=datstan, 
-  iter=5000,warmup = 2000, chains=1
+  iter=5000,warmup = 2000, chains=1, seed = 123
 )
 
 fitplp</code></pre>
@@ -1713,7 +1650,7 @@ fitplp</code></pre>
 </div>
 <div id="weakly-informative-priors-for-beta-and-theta---gammma1-5" class="section level2">
 <h2>Weakly informative priors for beta and theta - GAMMMA(1, 5)</h2>
-<pre class="r"><code>plpstan15 = '
+<pre class="r"><code>plpstan15 = &#39;
 functions{
   real nhpp_log(vector t, real beta, real theta, real tau){
     vector[num_elements(t)] loglik_part;
@@ -1740,16 +1677,19 @@ model{
 beta ~ gamma(1, 5);
 theta ~ gamma(1, 5);
 }
-'
+&#39;
 
 fitplp15 &lt;- stan(
   model_code=plpstan15, model_name=&quot;NHPP15&quot;, data=datstan, 
-  iter=5000,warmup = 2000, chains=1
+  iter=5000,warmup = 2000, chains=1, seed = 123
 )
 
 
-fitplp12</code></pre>
+fitplp15</code></pre>
 <p>Compared to MLE estimate of <span class="math inline">\(\hat{\beta} = 0.678, \hat{\theta} = 0.217\)</span>.</p>
+</div>
+<div id="failure-truncation-data" class="section level2">
+<h2>Failure truncation data</h2>
 </div>
 </div>
 
