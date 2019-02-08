@@ -148,7 +148,3 @@ l & = \log \Big(\prod_{i=1}^n\frac{\beta}{\theta}(\frac{t_i}{\theta})^{\beta - 1
 \end{align*}
 
 
-```{r}
-
-```
-

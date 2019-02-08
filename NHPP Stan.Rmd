@@ -190,13 +190,132 @@ datfailure = list(
   t = t1)
 ```
 
+## Gamma(100, 1) as the prior
+
+Gamma distribution parameterization in Stan:
+
+$$\text{Gamma}(y|\alpha, \beta) = \frac{\beta^\alpha}{\Gamma(\alpha)}y^{\alpha-1}\exp(-\beta y)$$
+
+Here we assume that $\beta \sim gamma(1, 1), \theta \sim gamma(100, 1)$. So essentially $\beta \sim EXP(1)$, while the probability density function of $\theta$ can be re-written as:
+
+$$f(y|\alpha, \beta) = \frac{100}{99!}y^{99}\exp(-y)$$
+
 ```{r}
+PGAM = function(x, alpha, beta) return(beta^alpha/factorial(alpha)*x^(alpha - 1)*exp(-beta*x))
+x = seq(1, 200, 0.1)
+p = PGAM(x, 100, 1)
+plot(x, p, type = "l", main = "Gamma(100, 1)")
+```
+
+
+```{r}
+plpstan11 = '
+functions{
+  real nhpp_log(vector t, real beta, real theta, real tau){
+    vector[num_elements(t)] loglik_part;
+    real loglikelihood;
+    for (i in 1:num_elements(t)){
+      loglik_part[i] = log(beta) - beta*log(theta) + (beta - 1)*log(t[i]);
+    }
+    loglikelihood = sum(loglik_part) - (tau/theta)^beta;
+    return loglikelihood;
+  }
+}
+data {
+  int<lower=0> n; //total # of obs
+  real<lower=0> tau;//truncated time
+  vector<lower=0>[n] t; //failure time
+}
+parameters{
+  real<lower=0> beta;
+  real<lower=0> theta;
+}
+model{
+  t ~ nhpp(beta, theta, tau);
+//PRIORS
+  beta ~ gamma(1, 1);
+  theta ~ gamma(100, 1);
+}
+'
+
+
 plpfailure <- stan(
   model_code=plpstan11, model_name="NHPPfailureT", data=datfailure, 
-  iter=5000,warmup = 2000, chains=1, seed = 123
+  iter=5000,warmup = 2000, chains=1, seed = 123, init = list(chain_1 = list(beta = 0.5, theta = 100))
 )
 
 plpfailure
 ```
+
+## Gamma(1, 100) as the prior
+
+```{r}
+PGAM = function(x, alpha, beta) return(beta^alpha/factorial(alpha)*x^(alpha - 1)*exp(-beta*x))
+x = seq(1, 200, 0.1)
+p = PGAM(x, 1, 0.01)
+plot(x, p, type = "l", main = "Gamma(1, 0.01)")
+```
+
+
+
+
+## Rerun the model with exponential(0.01)/gamma(1, 0.01) prior for beta
+
+Exponential distribution parameterization in Stan:
+
+$$\text{Exponential}(y|\beta) = \beta\exp(-\beta y)$$
+
+```{r}
+PEXP = function(x, beta) return(beta*exp(-beta*x))
+x = seq(1, 200, 0.1)
+p = PEXP(x, 1/100)
+plot(x, p, type = "l", main = "Exponential(0.01)")
+```
+
+
+```{r}
+plpstanexp = '
+functions{
+  real nhpp_log(vector t, real beta, real theta, real tau){
+    vector[num_elements(t)] loglik_part;
+    real loglikelihood;
+    for (i in 1:num_elements(t)){
+      loglik_part[i] = log(beta) - beta*log(theta) + (beta - 1)*log(t[i]);
+    }
+    loglikelihood = sum(loglik_part) - (tau/theta)^beta;
+    return loglikelihood;
+  }
+}
+data {
+  int<lower=0> n; //total # of obs
+  real<lower=0> tau;//truncated time
+  vector<lower=0>[n] t; //failure time
+}
+parameters{
+  real<lower=0> beta;
+  real<lower=0> theta;
+}
+model{
+  t ~ nhpp(beta, theta, tau);
+//PRIORS
+  beta ~ gamma(1, 1);
+  theta ~ exponential(0.01);
+}
+'
+
+
+plpfailureexp <- stan(
+  model_code=plpstanexp, model_name="NHPPfailureT", data=datfailure, 
+  iter=5000,warmup = 2000, chains=1, seed = 123
+  #, init = list(chain_1 = list(beta = 0.5, theta = 100))
+)
+
+plpfailureexp
+
+plpdraws = extract(plpfailureexp)
+mean(plpdraws$beta)
+mean(plpdraws$theta)
+```
+
 
 # References

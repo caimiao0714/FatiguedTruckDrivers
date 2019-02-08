@@ -1,0 +1,151 @@
+---
+title: "Statistical modelling and validation using 500 drivers"
+author: Miao Cai^[Department of Epidemiology and Biostatistics, Saint Louis University.
+  Email address [miao.cai@slu.edu](miao.cai@slu.edu)]
+date: "`r Sys.Date()`"
+output:
+  pdf_document: 
+    number_sections: true
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, eval=TRUE)
+```
+
+# Logistic regression
+
+## Logistic regression predicted by cumulative driving time
+
+$$Y \sim Bernoulli(p)$$
+$$\text{Logit}\frac{p}{1-p} = \beta_{1, d(i)} + \beta_{2, d(i)}*CT$$
+
+- 498 drivers
+- in total: 283,321 trips
+- Train data: 10% in each driver = 28,335 trips
+- test data: the rest 90% = 254,733 trips
+
+```{r cars}
+t = readRDS("data/t.Rds")
+
+require(dplyr)
+
+set.seed(123)
+
+t = t %>% 
+  mutate(driverID = as.numeric(as.factor(driver1)),
+         outlogit = ifelse(cnum>0, 1, 0),
+         travelTime = travelTime/60) %>% 
+  select(outlogit, driverID, cumTravel, cumDrive, travelTime)
+
+traindat = t %>% group_by(driverID) %>% 
+  sample_frac(0.1) %>% 
+  ungroup() 
+
+testdat = t %>% anti_join(traindat) %>% sample_frac(0.1)
+
+logit500drive = readRDS("data/logit500drive.rds")
+
+broom::tidy(logit500drive)
+
+require(rstanarm)
+
+y_rep1 = posterior_linpred(logit500drive, newdata = testdat, draws = 1)
+y_rep2 = unlist(t(y_rep1)[,1])
+
+testdat1 = testdat %>%
+  mutate(predicted_p = boot::inv.logit(y_rep2),
+         predicted_linear = y_rep2,
+         event = factor(outlogit))
+```
+
+```{r}
+require(ggplot2)
+
+testdat1 %>% 
+  ggplot(aes(x = predicted_p, 
+             group = event, 
+             color = event)) + 
+  geom_density() +
+  ggtitle("Density plots of predicted probabilities stratified by event")
+```
+
+```{r}
+testdat1 %>% 
+  ggplot(aes(x = predicted_linear, 
+             group = event, 
+             color = event)) + 
+  geom_density() +
+  ggtitle("Density plots of predicted linear terms by event")
+```
+
+
+
+```{r}
+options(scipen = 999)
+testdat1 = data.table::data.table(testdat1)
+testdat1[event == 1 & predicted_p >0.5, .N]/testdat1[event == 1,.N]
+testdat1[event == 0 & predicted_p >0.5, .N]/testdat1[event == 0,.N]
+```
+
+## Comparing drivers 1-100 and 100-199
+
+```{r}
+pacman::p_load(dplyr, ggplot2, tidyr)
+
+logit1_100 = readRDS("data/logit1_100.rds")
+logit100_199 = readRDS("data/logit100_199.rds")
+options(scipen = 999)
+t = broom::tidy(
+  logit1_100, parameters = "varying", intervals = TRUE, prob = 0.95)
+t1 = broom::tidy(
+  logit100_199, parameters = "varying", intervals = TRUE, prob = 0.95)
+```
+
+```{r}
+l1_100 = broom::tidy(
+  logit1_100, intervals = TRUE, prob = 0.95) %>% 
+  mutate(model = "logit1_100",
+         std.error = NULL) %>% 
+  gather(key = "type", value = "value", -term, -model)
+
+l100_199 = broom::tidy(
+  logit100_199, intervals = TRUE, prob = 0.95) %>% 
+  mutate(model = "logit100_199",
+         std.error = NULL) %>% 
+  gather(key = "type", value = "value", -term, -model)
+
+plot_post = function(x = "(Intercept)"){
+  rbind(l1_100, l100_199) %>% 
+  filter(term == x) %>% 
+  ggplot(aes(value, model)) + geom_point() + geom_line() +
+    ggtitle(paste0("Posterior plot of ", x))
+}
+
+plot_post("(Intercept)")
+plot_post("cumDrive")
+plot_post("travelTime")
+```
+
+
+
+## Adding a quadratic predictor of cumulative driving time square
+
+```{r}
+logit100square = readRDS("data/logit100square.rds")
+
+logit100square
+```
+
+```{r}
+x = seq(0, 13, 0.1)
+y = -4.89 - 0.02*x - 0.05*x^2
+plot(x, y, type = "l")
+plot(x, gtools::inv.logit(y), type = "l")
+```
+
+
+```{r}
+cpois = readRDS("data/cpois500drive.Rds")
+```
+

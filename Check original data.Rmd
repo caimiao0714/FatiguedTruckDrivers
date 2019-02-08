@@ -1,0 +1,40 @@
+---
+title: "Check original data"
+author: "Miao Cai <miao.cai@slu.edu>"
+date: "2/3/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+t = readRDS("data/t.Rds")
+
+pacman::p_load(tidyverse)
+
+dat = t %>% 
+  select(driver1, driver2, shift, begDate, EndTime, 
+         travelTime, waiting_time,
+         cumDrive, cumTravel, distance, cnum) %>% 
+  mutate(travelTime = round(travelTime/60, 3),
+         waiting_time = round(waiting_time/60, 3))
+
+View(dat)
+
+dri_shift = dat %>% group_by(driver1, shift) %>% 
+  summarise(shift_time = max(cumDrive))
+
+dat = dat %>% 
+  left_join(dri_shift, by = c("driver1", "shift"))
+
+
+dat %>% 
+  filter(cnum>0) %>% 
+  mutate(CTpercent = cumDrive/shift_time) %>% 
+  arrange(desc(CTpercent)) %>% 
+  mutate(plotid = 1:n()) %>% 
+  ggplot(aes(plotid, CTpercent)) + geom_line()
+```
+

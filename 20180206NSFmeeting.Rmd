@@ -1,0 +1,330 @@
+---
+title: "20180206 NSF meeting"
+author: "Miao Cai^[Department of Epidemiology and Biostatistics, College for Public Health and Social Justice, Saint Louis University. Email: [miao.cai@slu.edu](mailto:miao.cai@slu.edu)]"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: 
+    number_sections: true
+  html_document: default
+link-citations: true
+linkcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache = FALSE)
+```
+
+```{r eval=FALSE}
+pacman::p_load(tidyverse, broom, rstanarm, brms, bbplot)
+
+sub_cumdrive_slope = function(path, offset = FALSE){
+  quanfiles = gsub(".rds", "", list.files(path))
+  quanpath = paste0(path, list.files(path))
+  
+  quanfit = list()
+  quanread = function(filename, path){
+    quanfit[[filename]] = readRDS(path)
+  }
+  
+  for (i in seq_along(quanfiles)) {
+    temt = readRDS(quanpath[i])
+    quanfit[[quanfiles[i]]] = broom::tidy(temt, intervals = TRUE, prob = 0.95)
+  }
+  
+  quantable = bind_rows(quanfit, .id = "column_label")
+  if(offset){
+    quantable$column_label = as.numeric(gsub(".*([0-9]{2})_.*", "\\1", quantable$column_label))
+  }else{
+    z1 = as.numeric(substr(quantable$column_label, 7, 8))
+    z1[is.na(z1)] = (as.numeric(substr(quantable$column_label, 10, 11)) - 1)[is.na(z1)]
+    quantable$column_label = z1
+    rm(z1)
+  }
+  
+  return(quantable)
+}
+
+logitsub = sub_cumdrive_slope("data/CEratequantile/")
+cpoi5sub = sub_cumdrive_slope("data/CEratequantileCPOIS/")
+cpoi4sub = sub_cumdrive_slope("data/CPOIS4/")
+cpoi3sub = sub_cumdrive_slope("data/CPOIS3/")
+cpoi2sub = sub_cumdrive_slope("data/CPOIS2/")
+logitOFFSETsub = sub_cumdrive_slope("data/cpoisnooffset/")
+cpoisOFFSETsub = sub_cumdrive_slope("data/LogitNOoffset/", TRUE)
+
+saveRDS(quantable, "data/logitsub.rds")
+saveRDS(cpoi5sub, "data/cpoi5sub.rds")
+saveRDS(cpoi4sub, "data/cpoi4sub.rds")
+saveRDS(cpoi3sub, "data/cpoi3sub.rds")
+saveRDS(cpoi2sub, "data/cpoi2sub.rds")
+saveRDS(logitOFFSETsub, "data/logitOFFSETsub.rds")
+saveRDS(cpoisOFFSETsub, "data/cpoisOFFSETsub.rds")
+```
+
+```{r}
+pacman::p_load(tidyverse)
+rds_vec = c("logitsub", "cpoi5sub", "cpoi4sub", "cpoi3sub", "cpoi2sub", "logitOFFSETsub", "cpoisOFFSETsub")
+
+for (i in rds_vec) {
+  assign(i, readRDS(paste0("data/", i, ".rds")))
+}
+
+plot_cumdrive_slp = function(dat, plot_title){
+  p = get(dat) %>% 
+    filter(term %in% c("cumDrive", "b_cumDrive")) %>% 
+    ggplot(aes(x = column_label, y = estimate)) + 
+    geom_point(color="red") + geom_errorbar(aes(ymax = upper, ymin = lower)) +
+    geom_hline(yintercept = 0, color = "blue", size=2,alpha=0.5) + theme_bw() + 
+    ggtitle(plot_title) + xlab("quantiles of driver's CT rates (%)")
+}
+
+for (i in rds_vec) {
+  assign(i, plot_cumdrive_slp(dat = i, plot_title = i))
+}
+```
+
+# At what stage did the drivers have critival events?
+
+```{r}
+t = readRDS("data/t.Rds")
+
+pacman::p_load(tidyverse)
+
+dat = t %>% 
+  select(driver1, driver2, shift, begDate, EndTime, 
+         travelTime, waiting_time,
+         cumDrive, cumTravel, distance, cnum) %>% 
+  mutate(travelTime = round(travelTime/60, 3),
+         waiting_time = round(waiting_time/60, 3))
+
+dri_shift = dat %>% group_by(driver1, shift) %>% 
+  summarise(shift_time = max(cumDrive))
+
+dat = dat %>% 
+  left_join(dri_shift, by = c("driver1", "shift"))
+
+z = dat %>% 
+  filter(cnum>0) %>% 
+  mutate(CTpercent = cumDrive/shift_time) %>% 
+  arrange(desc(CTpercent)) %>% 
+  mutate(plotid = 1:n()) 
+
+
+ z %>% 
+  ggplot(aes(plotid, CTpercent)) + geom_point(alpha=0.3,size=0.02) + 
+  geom_hline(yintercept = 0.5, color = "blue", size=2,alpha=0.5) + theme_bw()+ 
+  xlab("Index of each CE-trip") + 
+  ylab("Cumulative driving time over total shift time")
+```
+
+\newpage
+
+# Subgroup analysis
+## Logistic regression for subgroups
+
+- Calculate the rate of critical events for each driver
+- Sort the rate of critical events
+- Divide the drivers into 20 subgroups according to the quantiles of CT rates
+- Construct random intercepts and random slopes models for these subgroups
+
+```{r}
+logitsub
+```
+
+\newpage
+
+## After removing the length of the trip - logit
+
+```{r}
+logitOFFSETsub
+```
+
+
+\newpage
+
+## Censored Poisson regression for subgroups
+
+I also tested the sensitivity of the threshold 5 for censored Poisson regression.
+
+```{r gridcpois}
+pacman::p_load(gridExtra)
+grid.arrange(cpoi5sub, cpoi4sub, cpoi3sub, cpoi2sub)
+```
+
+## After removing the length of the trip - censored Poisson
+
+```{r}
+cpoisOFFSETsub
+```
+
+
+\newpage
+
+# Checking the association between trip time and cumulative driving time
+
+## Boxplot on the distribution of trip time between CT and non-CT trips
+```{r}
+t = readRDS("data/t.Rds")
+
+t %>% 
+  mutate(CT_binary = ifelse(cnum > 0, "Yes", "No"),
+         travelTime = round(travelTime/60, 2)) %>% 
+  ggplot(aes(CT_binary, travelTime)) +
+  geom_violin(alpha = 0.3, width = 1.5, size = 1, fill = "#1F3552", color = "#1F3552") +
+  geom_boxplot(width = 0.5, alpha = 0.8) + theme_bw() + 
+  xlab("Whether critical event occurred or not") + ylab("length of the trip (hours)") + 
+  ggtitle("Boxplot of trip time by CT")+ coord_flip()
+# geom_jitter(width = 0.2, alpha = 0.01)
+```
+
+\newpage
+
+## Scatterplot on trip time and cumulative driving time
+```{r}
+t %>% 
+  mutate(CT_binary = ifelse(cnum > 0, "Yes", "No"),
+         travelTime = round(travelTime/60, 2)) %>% 
+  select(travelTime, cumDrive, CT_binary) %>% 
+  ggplot(aes(cumDrive, travelTime)) + 
+  geom_point(alpha = 0.2) + 
+  xlab("Cumulative driving time in a shift (hours)") + 
+  ylab("length of time in a trip (hours)")+
+  ggtitle("Trip time over cumulative driving time among CT trips")+ 
+  geom_smooth(span = 0.3, size = 2)+
+  facet_grid(.~CT_binary)
+```
+
+```{r}
+t %>% 
+  mutate(CT_binary = ifelse(cnum > 0, "Yes", "No"),
+         travelTime = round(travelTime/60, 2)) %>% 
+  select(travelTime, cumDrive, CT_binary) %>% 
+  ggplot(aes(cumDrive, travelTime, color = CT_binary)) + 
+  geom_point(alpha = 0.05) + 
+  xlab("Cumulative driving time in a shift (hours)") + 
+  ylab("length of time in a trip (hours)")+
+  ggtitle("Trip time over cumulative driving time among CT trips")+ 
+  geom_smooth()
+```
+
+
+## Caculating cumulative driving time by adding up CT in each trip
+
+```{r}
+pacman::p_load(tidyverse, lubridate, tidyr)
+t = readRDS("data/t.Rds")
+
+denom = t %>% 
+  group_by(driver_shift_id) %>% 
+  summarise(shifttime = max(cumDrive)) %>% 
+  mutate(hos_int = floor(shifttime), #hour of the shift, hos
+         hos_rem = shifttime - hos_int) 
+
+denvect = vector(length = 12)
+for (i in 1:12){
+  denvect[i] = sum(denom$hos_rem[denom$hos_int == (i-1)]) + sum(denom$hos_int >= i)
+}
+
+
+z = data.frame(x = 1:10, group = c(rep(1, 5), rep(2, 5)))
+z %>% group_by(group) %>% 
+  mutate(x = lag(x, default = 0))
+
+t1 = t %>% group_by(driver_shift_id) %>% 
+  mutate(cumDrivelag = lag(cumDrive, default = 0)) %>% 
+  ungroup()
+
+CE_tripmax = max(t$cnum[t$cnum >0 & t$cnum<50])
+CEDat = t1 %>% 
+  filter(cnum > 0 & cnum < 50) %>% 
+  separate(DATIME, sep = ";", into = paste0("CE_datime", 1:CE_tripmax)) %>% 
+  select(cumDrive, starts_with("CE_datime"))
+
+
+CEDat1 = CEDat %>% 
+  gather(key = "nCE", value = "CEtime", -cumDrive) %>% 
+  na.omit() %>% 
+  mutate(CE_hour = ceiling(cumDrive)) 
+
+nomin = CEDat1 %>% 
+  group_by(CE_hour) %>% 
+  summarise(n_CE = n())
+
+plot_perc = nomin %>% 
+  mutate(n_trips = denvect,
+         perc = round(n_CE*100/n_trips, 3))
+
+plot_perc %>% 
+  ggplot(aes(x = CE_hour, y = perc)) + 
+  geom_bar(stat = 'identity', fill = "#4271AE") + theme_bw() +
+  xlab("Hour of the shift") + ylab("Critical event rates (%)") +
+  ggtitle("The rate (%) of critical events in each hour of the shift")
+```
+
+## Calculating CT by adding driving time in each previous trip and time to CE in the last trip
+
+```{r}
+pacman::p_load(tidyverse, lubridate, tidyr)
+t = readRDS("data/t.Rds")
+
+denom = t %>% 
+  group_by(driver_shift_id) %>% 
+  summarise(shifttime = max(cumDrive)) %>% 
+  mutate(hos_int = floor(shifttime), #hour of the shift, hos
+         hos_rem = shifttime - hos_int) 
+
+denvect = vector(length = 12)
+for (i in 1:12){
+  denvect[i] = sum(denom$hos_rem[denom$hos_int == (i-1)]) + sum(denom$hos_int >= i)
+}
+
+
+z = data.frame(x = 1:10, group = c(rep(1, 5), rep(2, 5)))
+z %>% group_by(group) %>% 
+  mutate(x = lag(x, default = 0))
+
+t1 = t %>% group_by(driver_shift_id) %>% 
+  mutate(cumDrivelag = lag(cumDrive, default = 0)) %>% 
+  ungroup()
+
+CE_tripmax = max(t$cnum[t$cnum >0 & t$cnum<50])
+CEDat = t1 %>% 
+  filter(cnum > 0 & cnum < 50) %>% 
+  separate(DATIME, sep = ";", into = paste0("CE_datime", 1:CE_tripmax)) %>% 
+  select(begDate, starts_with("CE_datime"), cumDrivelag)
+
+
+CEDat1 = CEDat %>% 
+  gather(key = "nCE", value = "CEtime", -begDate, -cumDrivelag) %>% 
+  na.omit() %>% 
+  mutate(CEtime = lubridate::ymd_hms(CEtime),
+         withintripdiff = as.numeric(difftime(CEtime, begDate, units = "hours")),
+         CEcumdrive = cumDrivelag + withintripdiff,
+         CE_hour = ceiling(CEcumdrive),
+         CE_hour = ifelse(CE_hour == 0, 1, CE_hour)) 
+
+nomin = CEDat1 %>% 
+  group_by(CE_hour) %>% 
+  summarise(n_CE = n())
+
+plot_perc = nomin %>% 
+  mutate(n_trips = denvect,
+         perc = round(n_CE*100/n_trips, 3))
+
+plot_perc %>% 
+  ggplot(aes(x = CE_hour, y = perc)) + 
+  geom_bar(stat = 'identity', fill = "#4271AE") + theme_bw() +
+  xlab("Hour of the shift") + ylab("Critical event rates (%)") +
+  ggtitle("The rate (%) of critical events in each hour of the shift")
+```
+
+```{r eval=FALSE}
+t %>% 
+  dplyr::group_by(driver_shift_id) %>% 
+  dplyr::arrange(driver1, begDate) %>% 
+  dplyr::select(dplyr::row_number()==dplyr::n()) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = travelTime/60)) + geom_histogram()
+```
+
+

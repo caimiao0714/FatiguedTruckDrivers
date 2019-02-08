@@ -1,0 +1,74 @@
+---
+title: "20180213 NSF meeting"
+author: "Miao Cai^[Department of Epidemiology and Biostatistics, Saint Louis University. Email: [miao.cai@slu.edu](mailto:miao.cai@slu.edu)]"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: 
+    number_sections: true
+  html_document: default
+link-citations: true
+linkcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# NHPP simulation using `suvsim`
+
+```{r}
+library("poisson")
+
+intensity <- function(t) pmin(t/3, 1)
+rate <- 10
+num.events <- 10
+tevent = nhpp.sim(rate, num.events, prob.func=intensity)
+
+data.frame(
+  tevent, 
+  y = rep(1, length(tevent))
+  ) %>% 
+  ggplot(aes(tevent, y)) + geom_point() + geom_line()
+```
+
+
+# NHPP using one driver
+
+```{r}
+pacman::p_load(rstan, tidyverse)
+
+plpstan15 = '
+functions{
+  real nhpp_log(vector t, real beta, real theta, real tau){
+    vector[num_elements(t)] loglik_part;
+    real loglikelihood;
+    for (i in 1:num_elements(t)){
+      loglik_part[i] = log(beta) - beta*log(theta) + (beta - 1)*log(t[i]);
+    }
+    loglikelihood = sum(loglik_part) - (tau/theta)^beta;
+    return loglikelihood;
+  }
+}
+data {
+  int<lower=0> n; //total # of obs
+  real<lower=0> tau;//truncated time
+  vector<lower=0>[n] t; //failure time
+}
+parameters{
+  real<lower=0> beta;
+  real<lower=0> theta;
+}
+model{
+  t ~ nhpp(beta, theta, tau);
+//PRIORS
+beta ~ gamma(1, 5);
+theta ~ gamma(1, 5);
+}
+'
+
+fitplp15 <- stan(
+  model_code=plpstan15, model_name="NHPP15", data=datstan, 
+  iter=5000,warmup = 2000, chains=1, seed = 123
+)
+```
+
